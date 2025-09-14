@@ -109,269 +109,254 @@ export default class AnimationLoop {
      * Variable timestep update (for animations and visuals)
      */
     update(deltaTime, alpha) {
-        // Update camera
-        if (this.components.cameraController) {
-            this.components.cameraController.update();
-        }
-        
-        // Update Uranus rotation
-        if (this.components.uranus && !SimulationState.isPaused) {
-            this.components.uranus.update(deltaTime, SimulationState.timeSpeed);
-        }
-        // In the update method, pass moon positions to rings
-        if (this.components.rings && !SimulationState.isPaused) {
-            const uranusRotation = this.components.uranus ? 
-                this.components.uranus.getRotation() : 0;
-            
-            // Get current moon positions
-            const moonPositions = this.components.moons ? 
-                this.components.moons.getCurrentMoonPositions() : [];
-            
-            // Pass to rings update
-            this.components.rings.update(deltaTime, uranusRotation, moonPositions);
-        // Update rings
-        if (this.components.rings && !SimulationState.isPaused) {
-            const uranusRotation = this.components.uranus ? 
-                this.components.uranus.getRotation() : 0;
-            this.components.rings.update(deltaTime, uranusRotation);
-        }
-        
-        // Update magnetosphere
-        if (this.components.magnetosphere && !SimulationState.isPaused) {
-            const uranusRotation = this.components.uranus ? 
-                this.components.uranus.getRotation() : 0;
-            this.components.magnetosphere.update(deltaTime, uranusRotation);
-        }
-        
-        // Update starfield (very slow rotation)
-        if (this.components.starfield) {
-            this.components.starfield.update(deltaTime);
-        }
-        
-        // Update stats display
-        if (this.components.statsDisplay) {
-            const uranusRotation = this.components.uranus ? 
-                this.components.uranus.getRotation() : 0;
-            this.components.statsDisplay.update(uranusRotation);
-        }
-        
-        // Update camera info in UI
-        this.updateCameraInfo();
-        
-        // Check for quality adjustments
-        this.checkQualityAdjustment();
+    // Update camera first (needed for other components)
+    if (this.components.cameraController) {
+        this.components.cameraController.update();
     }
     
-    /**
-     * Render the scene
-     */
-    render() {
-        if (this.renderer && this.scene && this.camera) {
-            this.renderer.render(this.scene, this.camera);
+    // Get camera for components that need it
+    const camera = this.camera || (this.components.cameraController ? this.components.cameraController.camera : null);
+    
+    // === PLANETARY SYSTEM UPDATES === //
+    
+    // Update Uranus rotation (central body)
+    let uranusRotation = 0;
+    let uranusPosition = new THREE.Vector3(0, 0, 0);
+    
+    if (this.components.uranus && !SimulationState.isPaused) {
+        this.components.uranus.update(deltaTime, SimulationState.timeSpeed);
+        uranusRotation = this.components.uranus.getRotation();
+        uranusPosition = this.components.uranus.getWorldPosition();
+    }
+    
+    // === MOON SYSTEM UPDATES === //
+    
+    // Update moon positions and get their current state
+    let moonPositions = [];
+    let moonVelocities = [];
+    let moonMasses = [];
+    
+    if (this.components.moons && !SimulationState.isPaused) {
+        // Update moon orbital mechanics
+        this.components.moons.update(
+            deltaTime,
+            SimulationState.timeSpeed,
+            SimulationState.simulationTime
+        );
+        
+        // Get current moon positions for gravitational calculations
+        if (typeof this.components.moons.getCurrentMoonPositions === 'function') {
+            moonPositions = this.components.moons.getCurrentMoonPositions();
+        }
+        
+        // Get moon velocities if available (for more accurate physics)
+        if (typeof this.components.moons.getCurrentMoonVelocities === 'function') {
+            moonVelocities = this.components.moons.getCurrentMoonVelocities();
+        }
+        
+        // Get moon masses if available
+        if (typeof this.components.moons.getMoonMasses === 'function') {
+            moonMasses = this.components.moons.getMoonMasses();
         }
     }
     
-    /**
-     * Update camera info display
-     */
-    updateCameraInfo() {
-        if (this.components.cameraController) {
-            const info = this.components.cameraController.getInfo();
-            
-            // Update coordinate display
-            const elements = {
-                camX: document.getElementById('camX'),
-                camY: document.getElementById('camY'),
-                camZ: document.getElementById('camZ'),
-                camDist: document.getElementById('camDist'),
-                camAzimuth: document.getElementById('camAzimuth'),
-                camElevation: document.getElementById('camElevation')
+    // === RING SYSTEM UPDATES WITH GRAVITATIONAL EFFECTS === //
+    
+    if (this.components.rings && !SimulationState.isPaused) {
+        // Pass all relevant data to rings for gravitational calculations
+        this.components.rings.update(deltaTime, uranusRotation, moonPositions);
+        
+        // Optional: Add ring-moon interaction feedback
+        if (typeof this.components.rings.getRingDensityAt === 'function' && moonPositions.length > 0) {
+            // Check if any moons are passing through ring plane
+            moonPositions.forEach((moonPos, index) => {
+                const moonY = Math.abs(moonPos.y);
+                if (moonY < 1.0) { // Moon is near ring plane
+                    // Could trigger special effects like ring waves
+                    if (typeof this.components.rings.createMoonWake === 'function') {
+                        this.components.rings.createMoonWake(moonPos, moonVelocities[index]);
+                    }
+                }
+            });
+        }
+    }
+    
+    // === MAGNETOSPHERE UPDATES === //
+    
+    if (this.components.magnetosphere && !SimulationState.isPaused) {
+        this.components.magnetosphere.update(deltaTime, uranusRotation);
+        
+        // Optional: Add magnetosphere-moon interactions
+        if (typeof this.components.magnetosphere.updateMoonInteractions === 'function') {
+            this.components.magnetosphere.updateMoonInteractions(moonPositions);
+        }
+        
+        // Optional: Aurora intensity based on solar wind (simplified)
+        if (typeof this.components.magnetosphere.setAuroraIntensity === 'function') {
+            const solarWindStrength = 0.5 + 0.5 * Math.sin(SimulationState.simulationTime * 0.001);
+            this.components.magnetosphere.setAuroraIntensity(solarWindStrength);
+        }
+    }
+    
+    // === BACKGROUND UPDATES === //
+    
+    // Update starfield (very slow rotation for realism)
+    if (this.components.starfield) {
+        this.components.starfield.update(deltaTime);
+        
+        // Optional: Parallax effect based on camera movement
+        if (camera && typeof this.components.starfield.updateParallax === 'function') {
+            this.components.starfield.updateParallax(camera.position);
+        }
+    }
+    
+    // === UI AND STATS UPDATES === //
+    
+    // Update stats display with comprehensive data
+    if (this.components.statsDisplay) {
+        this.components.statsDisplay.update(uranusRotation);
+        
+        // Pass additional stats if the display supports them
+        if (typeof this.components.statsDisplay.updateExtendedStats === 'function') {
+            const extendedStats = {
+                moonCount: moonPositions.length,
+                ringOpacity: this.components.rings ? this.components.rings.getAverageOpacity() : 1.0,
+                magnetosphereActive: this.components.magnetosphere ? this.components.magnetosphere.group.visible : false,
+                cameraDistance: camera ? camera.position.length() : 0,
+                simulationSpeed: SimulationState.timeSpeed,
+                quality: PerformanceSettings.currentQuality
             };
-            
-            if (elements.camX) elements.camX.textContent = info.position.x.toFixed(1);
-            if (elements.camY) elements.camY.textContent = info.position.y.toFixed(1);
-            if (elements.camZ) elements.camZ.textContent = info.position.z.toFixed(1);
-            if (elements.camDist) elements.camDist.textContent = info.radius.toFixed(1);
-            if (elements.camAzimuth) elements.camAzimuth.textContent = info.theta.toFixed(1);
-            if (elements.camElevation) elements.camElevation.textContent = info.phi.toFixed(1);
+            this.components.statsDisplay.updateExtendedStats(extendedStats);
         }
     }
     
-    /**
-     * Update performance metrics
-     */
-    updatePerformanceMetrics(deltaTime) {
-        this.performanceMonitor.frameCount++;
-        this.performanceMonitor.totalTime += deltaTime;
-        
-        // Update average frame time
-        if (this.performanceMonitor.frameCount > 60) {
-            this.performanceMonitor.averageFrameTime = 
-                this.performanceMonitor.totalTime / this.performanceMonitor.frameCount;
-            
-            // Reset counters
-            this.performanceMonitor.frameCount = 0;
-            this.performanceMonitor.totalTime = 0;
-        }
-        
-        // Track slow frames
-        if (deltaTime > 33.33) { // Less than 30 FPS
-            this.performanceMonitor.slowFrames++;
+    // Update camera info in UI
+    this.updateCameraInfo();
+    
+    // === PERFORMANCE MONITORING === //
+    
+    // Check for quality adjustments based on performance
+    this.checkQualityAdjustment();
+    
+    // === INTERPOLATION FOR SMOOTH RENDERING === //
+    
+    // Apply interpolation for smoother visual updates (alpha blending)
+    if (alpha < 1.0 && !SimulationState.isPaused) {
+        this.applyInterpolation(alpha);
+    }
+    
+    // === SPECIAL EFFECTS AND EVENTS === //
+    
+    // Check for special astronomical events
+    this.checkAstronomicalEvents();
+    
+    // Update any particle effects
+    if (this.components.particleEffects) {
+        this.components.particleEffects.update(deltaTime);
+    }
+    
+    // === DEBUG VISUALIZATIONS === //
+    
+    // Update debug visualizations if enabled
+    if (this.debugMode) {
+        this.updateDebugVisualizations();
+    }
+}
+
+/**
+ * Apply interpolation for smooth rendering between physics steps
+ */
+applyInterpolation(alpha) {
+    // Interpolate moon positions for smooth motion
+    if (this.components.moons && typeof this.components.moons.interpolatePositions === 'function') {
+        this.components.moons.interpolatePositions(alpha);
+    }
+    
+    // Interpolate ring particles if supported
+    if (this.components.rings && typeof this.components.rings.interpolateParticles === 'function') {
+        this.components.rings.interpolateParticles(alpha);
+    }
+}
+
+/**
+ * Check for special astronomical events (eclipses, conjunctions, etc.)
+ */
+checkAstronomicalEvents() {
+    const currentTime = SimulationState.simulationTime;
+    
+    // Check for moon-moon conjunctions
+    if (this.components.moons && typeof this.components.moons.checkConjunctions === 'function') {
+        const conjunctions = this.components.moons.checkConjunctions();
+        if (conjunctions.length > 0) {
+            // Trigger visual effects for conjunctions
+            conjunctions.forEach(conjunction => {
+                console.log(`Conjunction: ${conjunction.moon1} and ${conjunction.moon2} at angle ${conjunction.angle}°`);
+            });
         }
     }
     
-    /**
-     * Check and adjust quality based on performance
-     */
-    checkQualityAdjustment() {
-        if (!PerformanceSettings.adaptiveQuality) return;
+    // Check for moon eclipses (moon in Uranus's shadow)
+    if (this.components.moons && typeof this.components.moons.checkEclipses === 'function') {
+        const eclipses = this.components.moons.checkEclipses(this.components.uranus);
+        if (eclipses.length > 0) {
+            // Darken eclipsed moons
+            eclipses.forEach(moonName => {
+                if (typeof this.components.moons.setMoonBrightness === 'function') {
+                    this.components.moons.setMoonBrightness(moonName, 0.3); // 30% brightness
+                }
+            });
+        }
+    }
+    
+    // Check for ring plane crossing events
+    if (this.lastRingPlaneAngle !== undefined) {
+        const currentAngle = uranusRotation % (Math.PI * 2);
+        const crossingThreshold = 0.1; // radians
         
-        const avgFrameTime = this.performanceMonitor.averageFrameTime;
-        const currentQuality = PerformanceSettings.currentQuality;
-        
-        // Check every 60 frames
-        if (this.performanceMonitor.frameCount !== 0) return;
-        
-        // Downgrade quality if performance is poor
-        if (avgFrameTime > 33.33 && currentQuality !== 'low') {
-            if (currentQuality === 'high') {
-                this.setQuality('medium');
-            } else if (currentQuality === 'medium') {
-                this.setQuality('low');
+        // Check if we've crossed the ring plane
+        if (Math.abs(currentAngle - Math.PI/2) < crossingThreshold || 
+            Math.abs(currentAngle - 3*Math.PI/2) < crossingThreshold) {
+            if (!this.ringPlaneCrossing) {
+                this.ringPlaneCrossing = true;
+                console.log('Ring plane crossing event!');
+                
+                // Temporarily reduce ring opacity for edge-on view
+                if (this.components.rings && typeof this.components.rings.setEdgeOnMode === 'function') {
+                    this.components.rings.setEdgeOnMode(true);
+                }
             }
-        }
-        
-        // Upgrade quality if performance is good
-        else if (avgFrameTime < 16.67 && this.performanceMonitor.slowFrames < 5) {
-            if (currentQuality === 'low') {
-                this.setQuality('medium');
-            } else if (currentQuality === 'medium') {
-                this.setQuality('high');
-            }
-        }
-        
-        // Reset slow frame counter
-        this.performanceMonitor.slowFrames = 0;
-    }
-    
-    /**
-     * Set rendering quality
-     */
-    setQuality(quality) {
-        console.log(`Adjusting quality to: ${quality}`);
-        PerformanceSettings.currentQuality = quality;
-        
-        // Update scene manager quality
-        if (this.components.sceneManager) {
-            this.components.sceneManager.applyQualitySettings(quality);
-        }
-        
-        // Update component quality
-        if (this.components.uranus) {
-            this.components.uranus.updateQuality(quality);
-        }
-        if (this.components.rings) {
-            this.components.rings.updateQuality(quality);
-        }
-        if (this.components.moons) {
-            this.components.moons.updateQuality(quality);
-        }
-        if (this.components.starfield) {
-            this.components.starfield.updateQuality(quality);
-        }
-    }
-    
-    /**
-     * Pause the simulation
-     */
-    pause() {
-        SimulationState.isPaused = true;
-    }
-    
-    /**
-     * Resume the simulation
-     */
-    resume() {
-        SimulationState.isPaused = false;
-        this.lastTime = performance.now();
-        this.accumulator = 0;
-    }
-    
-    /**
-     * Toggle pause state
-     */
-    togglePause() {
-        if (SimulationState.isPaused) {
-            this.resume();
         } else {
-            this.pause();
+            if (this.ringPlaneCrossing) {
+                this.ringPlaneCrossing = false;
+                if (this.components.rings && typeof this.components.rings.setEdgeOnMode === 'function') {
+                    this.components.rings.setEdgeOnMode(false);
+                }
+            }
         }
     }
-    
-    /**
-     * Set simulation speed
-     */
-    setTimeSpeed(speed) {
-        SimulationState.timeSpeed = speed;
+    this.lastRingPlaneAngle = uranusRotation % (Math.PI * 2);
+}
+
+/**
+ * Update debug visualizations
+ */
+updateDebugVisualizations() {
+    // Visualize gravitational field lines
+    if (this.debugGravityField && this.components.moons) {
+        const positions = this.components.moons.getCurrentMoonPositions();
+        // Update gravity field visualization
+        this.debugGravityField.update(positions);
     }
     
-    /**
-     * Get current FPS
-     */
-    getFPS() {
-        if (this.performanceMonitor.averageFrameTime === 0) return 60;
-        return Math.round(1000 / this.performanceMonitor.averageFrameTime);
+    // Visualize orbital paths
+    if (this.debugOrbitalPaths && this.components.moons) {
+        // Update predicted orbital paths
+        this.debugOrbitalPaths.update(SimulationState.simulationTime);
     }
     
-    /**
-     * Get performance report
-     */
-    getPerformanceReport() {
-        return {
-            fps: this.getFPS(),
-            averageFrameTime: this.performanceMonitor.averageFrameTime,
-            slowFrames: this.performanceMonitor.slowFrames,
-            quality: PerformanceSettings.currentQuality,
-            adaptiveQuality: PerformanceSettings.adaptiveQuality
-        };
-    }
-    
-    /**
-     * Enable/disable adaptive quality
-     */
-    setAdaptiveQuality(enabled) {
-        PerformanceSettings.adaptiveQuality = enabled;
-    }
-    
-    /**
-     * Force quality level
-     */
-    forceQuality(quality) {
-        PerformanceSettings.adaptiveQuality = false;
-        this.setQuality(quality);
-    }
-    
-    /**
-     * Reset simulation
-     */
-    reset() {
-        SimulationState.simulationTime = 0;
-        SimulationState.timeSpeed = 1;
-        SimulationState.isPaused = false;
-        this.accumulator = 0;
-        this.lastTime = performance.now();
-    }
-    
-    /**
-     * Dispose
-     */
-    dispose() {
-        this.stop();
-        
-        // Clear references
-        this.renderer = null;
-        this.scene = null;
-        this.camera = null;
-        this.components = null;
+    // Show performance overlay
+    if (this.debugPerformance) {
+        const stats = this.getPerformanceReport();
+        this.debugPerformance.update(stats);
     }
 }
