@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uranus System - Scientifically Accurate Simulation</title>
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/ui-panels.css">
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <!-- Main Canvas Container -->
+    <div id="canvas-container"></div>
+    
+    <!-- Loading Screen -->
+    <div id="loading">
+        <div>Initializing Uranus System...</div>
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- Information Panel -->
+    <div id="info-panel" class="ui-panel minimized">
+        <div class="panel-header">
+            <div class="panel-title">
+                <h1>⛢ URANUS</h1>
+            </div>
+            <div class="panel-controls">
+                <button class="panel-btn minimize-btn">−</button>
+            </div>
+        </div>
+        <div class="panel-content">
+            <p><strong>The Tilted Ice Giant</strong></p>
+            
+            <h2>Physical Properties</h2>
+            <p>Radius: 25,559 km (4× Earth)</p>
+            <p>Mass: 14.5× Earth</p>
+            <p>Rotation: 17.24 hours (retrograde)</p>
+            <p>Axial Tilt: 97.77° (sideways!)</p>
+            <p>Orbital Period: 84 Earth years</p>
+            
+            <h2>Atmosphere</h2>
+            <p>82.5% Hydrogen, 15.2% Helium</p>
+            <p>2.3% Methane (creates blue color)</p>
+            <p>Temperature: -224°C (coldest planet)</p>
+            
+            <h2>Ring System</h2>
+            <p>• 13 rings discovered in 1977</p>
+            <p>• ε (Epsilon) ring: brightest and densest</p>
+            <p>• Extremely dark (2-5% reflectivity)</p>
+            <p>• Particles: 20cm to 20m diameter</p>
+            
+            <h2>Major Moons</h2>
+            <p>Miranda, Ariel, Umbriel, Titania, Oberon</p>
+            <p>All tidally locked to Uranus</p>
+            
+            <h2>Unique Features</h2>
+            <p>• Only planet rolling on its side</p>
+            <p>• 42-year polar seasons</p>
+            <p>• Magnetosphere offset by 1/3 radius</p>
+        </div>
+    </div>
+    
+    <!-- Controls Panel -->
+    <div id="controls-panel" class="ui-panel minimized">
+        <div class="panel-header">
+            <div class="panel-title">
+                <h3>⚙ Controls</h3>
+            </div>
+            <div class="panel-controls">
+                <button class="panel-btn minimize-btn">−</button>
+            </div>
+        </div>
+        <div class="panel-content">
+            <div class="control-group">
+                <label>Time Speed:</label>
+                <input type="range" id="timeSpeed" min="-2" max="3" value="0" step="0.1">
+                <span id="timeSpeedValue">1 hour/sec</span>
+            </div>
+            
+            <div class="control-group">
+                <button class="control-button" id="pauseBtn">⏸ Pause</button>
+                <button class="control-button" id="resetBtn">⟲ Reset View</button>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showRings" checked> Show Rings
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showMoons" checked> Show Moons
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showOrbits" checked> Show Orbits
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showMagnetosphere"> Magnetosphere
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showLabels" checked> Show Labels
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showAxes"> Axis Helper
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>Distance Scale:</label>
+                <input type="range" id="distanceScale" min="0.3" max="2" value="1" step="0.1">
+                <span id="distanceValue">1.0x</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Moon Size:</label>
+                <input type="range" id="moonScale" min="1" max="5" value="2" step="0.5">
+                <span id="moonSizeValue">2x</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Ring Shine:</label>
+                <input type="range" id="ringShine" min="0" max="1" value="0.7" step="0.1">
+                <span id="ringShineValue">70%</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stats Panel -->
+    <div id="stats-panel" class="ui-panel">
+        <div class="panel-header">
+            <div class="panel-title">
+                <h3>📊 Stats</h3>
+            </div>
+            <div class="panel-controls">
+                <button class="panel-btn minimize-btn">−</button>
+            </div>
+        </div>
+        <div class="panel-content">
+            <div class="stat-line">
+                <span>FPS:</span>
+                <span id="fps">60</span>
+            </div>
+            <div class="stat-line">
+                <span>Sim Time:</span>
+                <span id="simDay">0d</span>
+            </div>
+            <div class="stat-line">
+                <span>Rotation:</span>
+                <span id="rotation">0°</span>
+            </div>
+            <div class="stat-line">
+                <span>Year Progress:</span>
+                <span id="yearProgress">0%</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Coordinates Panel -->
+    <div id="coordinates-panel">
+        <div><strong>Camera Position</strong></div>
+        <div>X: <span id="camX">0</span></div>
+        <div>Y: <span id="camY">0</span></div>
+        <div>Z: <span id="camZ">0</span></div>
+        <div>Distance: <span id="camDist">0</span></div>
+        <div>Azimuth: <span id="camAzimuth">0</span>°</div>
+        <div>Elevation: <span id="camElevation">0</span>°</div>
+    </div>
+    
+    <!-- Quick Toggle Buttons -->
+    <div class="quick-toggle">
+        <button id="quickRings" class="active" title="Toggle Rings">⭕</button>
+        <button id="quickMoons" class="active" title="Toggle Moons">🌙</button>
+        <button id="quickOrbits" class="active" title="Toggle Orbits">⚪</button>
+        <button id="quickMag" title="Toggle Magnetosphere">🧲</button>
+        <button id="quickLabels" class="active" title="Toggle Labels">📝</button>
+        <button id="quickAxes" title="Toggle Axes">📐</button>
+    </div>
+    
+    <!-- Moon Info Tooltip -->
+    <div id="moon-info">
+        <h3 id="moon-name">Moon</h3>
+        <p id="moon-details"></p>
+        <p id="moon-position"></p>
+    </div>
+    
+    <!-- Help Button -->
+    <button id="help-button" title="Help">?</button>
+    
+    <!-- Axis Helper Legend -->
+    <div class="axis-helper" style="display: none;">
+        <span style="color: #ff0000;">X (Red)</span> |
+        <span style="color: #00ff00;">Y (Green)</span> |
+        <span style="color: #0080ff;">Z (Blue)</span>
+    </div>
+    
+    <!-- JavaScript Modules -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
