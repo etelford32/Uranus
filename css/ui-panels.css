@@ -1,0 +1,244 @@
+/* ===================================
+   UI Panel Styles - Uranus Simulation
+   =================================== */
+
+/* Base Panel Styles */
+.ui-panel {
+    position: absolute;
+    background: rgba(0, 20, 40, 0.9);
+    border-radius: 10px;
+    border: 1px solid rgba(79, 208, 231, 0.3);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    z-index: 200;
+}
+
+.ui-panel.minimized {
+    overflow: hidden;
+}
+
+/* Panel Header */
+.panel-header {
+    padding: 10px 15px;
+    cursor: move;
+    background: rgba(79, 208, 231, 0.1);
+    border-radius: 10px 10px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(79, 208, 231, 0.2);
+}
+
+.panel-header h1,
+.panel-header h3 {
+    color: #4FD0E7;
+    margin: 0;
+    text-shadow: 0 0 10px rgba(79, 208, 231, 0.5);
+    pointer-events: none;
+}
+
+.panel-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Panel Controls */
+.panel-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.panel-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: rgba(79, 208, 231, 0.2);
+    color: #4FD0E7;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.panel-btn:hover {
+    background: rgba(79, 208, 231, 0.4);
+    transform: scale(1.1);
+}
+
+/* Panel Content */
+.panel-content {
+    padding: 15px;
+    max-height: 500px;
+    overflow-y: auto;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.minimized .panel-content {
+    max-height: 0;
+    padding: 0 15px;
+    opacity: 0;
+}
+
+/* Info Panel Specific */
+#info-panel {
+    top: 10px;
+    left: 10px;
+    width: 300px;
+}
+
+#info-panel h1 {
+    font-size: 20px;
+}
+
+#info-panel h2 {
+    color: #6FE5F5;
+    font-size: 14px;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid rgba(79, 208, 231, 0.3);
+    padding-bottom: 3px;
+}
+
+#info-panel p {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #b0d0e0;
+    margin: 3px 0;
+}
+
+/* Controls Panel Specific */
+#controls-panel {
+    bottom: 10px;
+    left: 10px;
+    width: 320px;
+}
+
+#controls-panel h3 {
+    font-size: 16px;
+}
+
+/* Stats Panel Specific */
+#stats-panel {
+    top: 10px;
+    right: 10px;
+    width: 200px;
+}
+
+#stats-panel .panel-content {
+    font-size: 12px;
+    color: #6FE5F5;
+}
+
+#stats-panel .stat-line {
+    margin: 5px 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Scrollbar Styling */
+.panel-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+    background: rgba(0, 20, 40, 0.5);
+    border-radius: 3px;
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+    background: rgba(79, 208, 231, 0.5);
+    border-radius: 3px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(79, 208, 231, 0.7);
+}
+
+/* Panel Dragging States */
+.ui-panel.dragging {
+    opacity: 0.9;
+    cursor: move;
+}
+
+.ui-panel.dragging .panel-header {
+    cursor: move;
+}
+
+/* Panel Animations */
+@keyframes panelSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ui-panel {
+    animation: panelSlideIn 0.3s ease-out;
+}
+
+/* Mobile Optimizations for Panels */
+@media (max-width: 768px) {
+    .ui-panel {
+        width: 280px !important;
+    }
+    
+    #controls-panel {
+        width: 300px !important;
+    }
+    
+    #stats-panel {
+        width: 180px !important;
+    }
+    
+    .panel-header {
+        padding: 8px 12px;
+    }
+    
+    .panel-content {
+        padding: 12px;
+        max-height: 400px;
+    }
+    
+    #info-panel h1 {
+        font-size: 18px;
+    }
+    
+    #info-panel h2 {
+        font-size: 13px;
+    }
+    
+    #info-panel p {
+        font-size: 11px;
+    }
+    
+    #controls-panel h3 {
+        font-size: 15px;
+    }
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .panel-header {
+        cursor: default;
+    }
+    
+    .panel-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
+    }
+    
+    .control-button {
+        padding: 10px 18px;
+        font-size: 13px;
+    }
+}
