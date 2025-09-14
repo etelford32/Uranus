@@ -99,7 +99,17 @@ export default class Moons {
             radius * Math.sin(trueAnomaly) * DisplaySettings.distanceScale
         );
     }
-    
+    // Add this method to get current moon positions
+    getCurrentMoonPositions() {
+        const positions = [];
+        MOONS_DATA.forEach(moonData => {
+            const moon = this.moonMeshes[moonData.name];
+            if (moon) {
+                positions.push(moon.position.clone());
+            }
+        });
+        return positions;
+    }
     /**
      * Create orbital path
      */
