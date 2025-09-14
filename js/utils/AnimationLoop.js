@@ -118,7 +118,17 @@ export default class AnimationLoop {
         if (this.components.uranus && !SimulationState.isPaused) {
             this.components.uranus.update(deltaTime, SimulationState.timeSpeed);
         }
-        
+        // In the update method, pass moon positions to rings
+        if (this.components.rings && !SimulationState.isPaused) {
+            const uranusRotation = this.components.uranus ? 
+                this.components.uranus.getRotation() : 0;
+            
+            // Get current moon positions
+            const moonPositions = this.components.moons ? 
+                this.components.moons.getCurrentMoonPositions() : [];
+            
+            // Pass to rings update
+            this.components.rings.update(deltaTime, uranusRotation, moonPositions);
         // Update rings
         if (this.components.rings && !SimulationState.isPaused) {
             const uranusRotation = this.components.uranus ? 
