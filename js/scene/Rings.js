@@ -489,35 +489,132 @@ export default class Rings {
         this.updateVisualEffects(deltaTime);
     }
     
-    /**
-     * Update shader uniforms
-     */
-    updateShaderUniforms(moonPositions) {
-        // Get camera from scene
-        const camera = this.scene.getObjectByProperty('isCamera', true);
-        const cameraPos = camera ? camera.position : new THREE.Vector3(0, 0, 100);
+/**
+ * Update shader uniforms
+ */
+updateShaderUniforms(moonPositions) {
+    // Get camera from scene
+    const camera = this.scene.getObjectByProperty('isCamera', true);
+    const cameraPos = camera ? camera.position : new THREE.Vector3(0, 0, 100);
+    
+    // Transform moon positions to ring's local coordinate system
+    let transformedMoonPositions = [];
+    let moonMasses = [];
+    
+    if (moonPositions && moonPositions.length > 0) {
+        // Get the inverse of the ring group's world matrix to transform to local space
+        const inverseMatrix = new THREE.Matrix4();
+        inverseMatrix.copy(this.group.matrixWorld).invert();
         
-        // Update each ring's material uniforms
-        this.ringMeshes.forEach(ring => {
-            if (ring.material.uniforms && !ring.userData.isSimple) {
-                ring.material.uniforms.time.value = this.time;
-                ring.material.uniforms.cameraPosition.value = cameraPos;
+        // Calculate gravitational influence for each moon and sort by influence
+        const moonInfluences = moonPositions.map((moonData, index) => {
+            // Transform position to ring's local space
+            const localPos = moonData.position.clone();
+            localPos.applyMatrix4(inverseMatrix);
+            
+            // Get moon mass (approximate based on radius if available)
+            const moonInfo = MOONS_DATA[index] || MOONS_DATA[0];
+            const mass = Math.pow(moonInfo.radius, 3); // Simple mass approximation
+            
+            // Calculate average distance to ring system (using middle radius)
+            const avgRingRadius = (RINGS_DATA[0].innerRadius + RINGS_DATA[RINGS_DATA.length - 1].outerRadius) / 2;
+            const distanceToRings = Math.max(0.1, Math.abs(localPos.length() - avgRingRadius));
+            
+            // Gravitational influence is proportional to mass/distance²
+            const influence = mass / (distanceToRings * distanceToRings);
+            
+            return {
+                position: localPos,
+                mass: mass,
+                influence: influence,
+                type: moonData.type || 'major'
+            };
+        });
+        
+        // Sort by influence and prioritize major moons
+        moonInfluences.sort((a, b) => {
+            // Prioritize major moons
+            if (a.type === 'major' && b.type !== 'major') return -1;
+            if (b.type === 'major' && a.type !== 'major') return 1;
+            // Then sort by influence
+            return b.influence - a.influence;
+        });
+        
+        // Take the 5 most influential moons
+        const topMoons = moonInfluences.slice(0, 5);
+        transformedMoonPositions = topMoons.map(m => m.position);
+        moonMasses = topMoons.map(m => m.mass);
+    }
+    
+    // Update each ring's material uniforms
+    this.ringMeshes.forEach(ring => {
+        if (ring.material.uniforms && !ring.userData.isSimple) {
+            // Update time
+            ring.material.uniforms.time.value = this.time;
+            
+            // Update camera position in world space
+            ring.material.uniforms.cameraPosition.value = cameraPos;
+            
+            // Update moon data for gravitational effects
+            if (transformedMoonPositions.length > 0) {
+                // Update moon positions in ring's local space
+                if (ring.material.uniforms.moonPositions) {
+                    ring.material.uniforms.moonPositions.value = transformedMoonPositions;
+                }
                 
-                // Update moon positions if provided
-                if (moonPositions && moonPositions.length > 0 && ring.material.uniforms.moonPositions) {
-                    ring.material.uniforms.moonPositions.value = moonPositions.slice(0, 5);
-                    ring.material.uniforms.moonCount.value = Math.min(moonPositions.length, 5);
+                // Update moon masses
+                if (ring.material.uniforms.moonMasses) {
+                    ring.material.uniforms.moonMasses.value = moonMasses;
+                }
+                
+                // Update moon count
+                if (ring.material.uniforms.moonCount) {
+                    ring.material.uniforms.moonCount.value = transformedMoonPositions.length;
+                }
+                
+                // Calculate density wave effects based on resonances
+                const ringRadius = (ring.userData.innerRadius + ring.userData.outerRadius) / 2;
+                let resonanceStrength = 0;
+                
+                // Check for resonances with nearby moons
+                transformedMoonPositions.forEach((moonPos, idx) => {
+                    const moonDist = moonPos.length();
+                    const ratio = ringRadius / moonDist;
+                    
+                    // Check for common resonances (2:1, 3:2, 4:3)
+                    if (Math.abs(ratio - 0.63) < 0.05) { // ~2:1 resonance
+                        resonanceStrength += moonMasses[idx] * 0.5;
+                    } else if (Math.abs(ratio - 0.76) < 0.05) { // ~3:2 resonance
+                        resonanceStrength += moonMasses[idx] * 0.3;
+                    } else if (Math.abs(ratio - 0.83) < 0.05) { // ~4:3 resonance
+                        resonanceStrength += moonMasses[idx] * 0.2;
+                    }
+                });
+                
+                // Update density wave amplitude based on resonances
+                if (ring.material.uniforms.densityWaveAmplitude) {
+                    const baseAmplitude = 0.05;
+                    ring.material.uniforms.densityWaveAmplitude.value = 
+                        baseAmplitude + Math.min(resonanceStrength * 0.1, 0.2);
+                }
+                
+                // Update density wave frequency based on orbital period
+                if (ring.material.uniforms.densityWaveFrequency) {
+                    const orbitalPeriod = ring.userData.orbitalPeriod || 1;
+                    ring.material.uniforms.densityWaveFrequency.value = 
+                        10.0 * (1.0 + resonanceStrength * 0.5);
                 }
             }
-        });
-        
-        // Update glow uniforms
-        this.glowMeshes.forEach(glow => {
-            if (glow.material.uniforms && glow.material.uniforms.time) {
-                glow.material.uniforms.time.value = this.time;
-            }
-        });
-    }
+        }
+    });
+    
+    // Update glow uniforms
+    this.glowMeshes.forEach(glow => {
+        if (glow.material.uniforms && glow.material.uniforms.time) {
+            glow.material.uniforms.time.value = this.time;
+        }
+    });
+}
     
     /**
      * Update visual effects
