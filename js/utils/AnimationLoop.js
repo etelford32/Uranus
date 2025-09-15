@@ -381,6 +381,11 @@ export default class AnimationLoop {
     // Update simulation time
     SimulationState.simulationTime += deltaTime * SimulationState.timeSpeed;
     
+    // Update physics if enabled
+    if (this.components.physicsEngine && this.components.physicsEngine.enabled) {
+        this.components.physicsEngine.update(deltaTime, SimulationState.timeSpeed);
+    }
+    
     // Update orbital mechanics with interpolation state caching
     if (this.components.moons) {
       this.cacheInterpolationState('moons', this.components.moons.getCurrentMoonPositions());
