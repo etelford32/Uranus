@@ -19,6 +19,8 @@ import PanelManager from './ui/PanelManager.js';
 import StatsDisplay from './ui/StatsDisplay.js';
 import ControlBindings from './ui/ControlBindings.js';
 import AnimationLoop from './utils/AnimationLoop.js';
+import PhysicsEngine from './physics/PhysicsEngine.js';
+import PhysicsPanel from './ui/PhysicsPanel.js';
 
 /**
  * Enhanced Main Application Class
@@ -321,7 +323,20 @@ class UranusSimulation {
                 required: false
             }
         ];
-        
+        this.initPhysics();
+
+        // Add new method
+        initPhysics() {
+            // Create physics engine
+            this.physicsEngine = new PhysicsEngine(this.scene, this);
+            
+            // Create physics UI panel
+            this.physicsPanel = new PhysicsPanel(this.physicsEngine, this);
+            this.physicsPanel.create();
+            
+            // Initially disabled - user can enable via UI
+            this.physicsEngine.setEnabled(false);
+        }
         for (const obj of objects) {
             try {
                 this.updateLoadingMessage(`Creating ${obj.name}...`);
