@@ -3,7 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uranus System - Scientifically Accurate Simulation</title>
+    <meta name="description" content="Interactive 3D simulation of Uranus and its moons with advanced physics">
+    <meta name="keywords" content="Uranus, astronomy, physics, simulation, moons, rings, gravity">
+    <meta name="author" content="Uranus Simulation">
+    
+    <title>Uranus System - Advanced Physics Simulation</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛢</text></svg>">
     
     <!-- Stylesheets -->
     <link rel="stylesheet" href="css/main.css">
@@ -11,6 +18,290 @@
     
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Additional styles for physics features -->
+    <style>
+        /* Physics Engine Styles */
+        .physics-banner {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: linear-gradient(135deg, rgba(255, 107, 157, 0.9), rgba(79, 208, 231, 0.9));
+            padding: 12px 24px;
+            border-radius: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .physics-banner:hover {
+            transform: translateX(-50%) translateY(-2px);
+            box-shadow: 0 6px 30px rgba(79, 208, 231, 0.4);
+        }
+        
+        .physics-toggle-main {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+        
+        .physics-toggle-main input[type="checkbox"] {
+            width: 0;
+            height: 0;
+            opacity: 0;
+            position: absolute;
+        }
+        
+        .physics-toggle-main .toggle-slider {
+            width: 50px;
+            height: 26px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 13px;
+            position: relative;
+            transition: background 0.3s;
+        }
+        
+        .physics-toggle-main .toggle-slider::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .physics-toggle-main input:checked + .toggle-slider {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
+        .physics-toggle-main input:checked + .toggle-slider::after {
+            transform: translateX(24px);
+        }
+        
+        .physics-toggle-main span {
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        
+        .physics-status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            font-size: 11px;
+            color: white;
+        }
+        
+        .physics-status .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+        
+        .physics-status.active .status-dot {
+            background: #44ff44;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Experiment Buttons */
+        .experiment-buttons {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        
+        .experiment-btn {
+            background: rgba(0, 20, 40, 0.9);
+            border: 1px solid rgba(79, 208, 231, 0.3);
+            color: #4FD0E7;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .experiment-btn:hover {
+            background: rgba(79, 208, 231, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(79, 208, 231, 0.3);
+        }
+        
+        /* Physics Indicators */
+        .physics-indicators {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background: rgba(0, 20, 40, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid rgba(79, 208, 231, 0.3);
+            font-size: 11px;
+            color: #6FE5F5;
+            display: none;
+        }
+        
+        .physics-indicators.visible {
+            display: block;
+        }
+        
+        .indicator-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+        
+        .indicator-item .label {
+            color: #b0d0e0;
+        }
+        
+        .indicator-item .value {
+            color: #4FD0E7;
+            font-weight: bold;
+        }
+        
+        /* Enhanced Quick Toggle */
+        .quick-toggle {
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            transform: translateY(-50%);
+            background: rgba(0, 20, 40, 0.8);
+            border-radius: 5px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            border: 1px solid rgba(79, 208, 231, 0.3);
+            z-index: 100;
+        }
+        
+        .quick-toggle .separator {
+            height: 1px;
+            background: rgba(79, 208, 231, 0.3);
+            margin: 2px 0;
+        }
+        
+        #quickPhysics {
+            background: linear-gradient(135deg, rgba(255, 107, 157, 0.3), rgba(79, 208, 231, 0.3));
+        }
+        
+        #quickPhysics.active {
+            background: linear-gradient(135deg, rgba(255, 107, 157, 0.6), rgba(79, 208, 231, 0.6));
+            animation: physicsGlow 2s infinite;
+        }
+        
+        @keyframes physicsGlow {
+            0%, 100% { box-shadow: 0 0 5px rgba(255, 107, 157, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(79, 208, 231, 0.8); }
+        }
+        
+        /* Tutorial Overlay */
+        .tutorial-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            z-index: 2000;
+            backdrop-filter: blur(5px);
+        }
+        
+        .tutorial-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(0, 20, 40, 0.95), rgba(20, 40, 60, 0.95));
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid rgba(79, 208, 231, 0.5);
+            max-width: 500px;
+            color: white;
+        }
+        
+        .tutorial-content h2 {
+            color: #4FD0E7;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .tutorial-content ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .tutorial-content li {
+            margin: 10px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .tutorial-content li::before {
+            content: '✨';
+            position: absolute;
+            left: 0;
+        }
+        
+        .tutorial-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #4FD0E7;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        /* Loading enhancements */
+        #loading .progress-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(79, 208, 231, 0.2);
+            border-radius: 2px;
+            margin: 20px auto;
+            overflow: hidden;
+        }
+        
+        #loading .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4FD0E7, #ff6b9d);
+            width: 0%;
+            animation: loadProgress 2s ease-out forwards;
+        }
+        
+        @keyframes loadProgress {
+            to { width: 100%; }
+        }
+    </style>
 </head>
 <body>
     <!-- Main Canvas Container -->
@@ -18,8 +309,29 @@
     
     <!-- Loading Screen -->
     <div id="loading">
-        <div>Initializing Uranus System...</div>
-        <div class="spinner"></div>
+        <div class="loading-content">
+            <div>🌌 Initializing Uranus System...</div>
+            <div class="spinner"></div>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            <div style="font-size: 12px; margin-top: 10px; opacity: 0.7;">
+                Loading 27 moons, 13 rings, and gravitational physics...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Physics Engine Banner -->
+    <div class="physics-banner" id="physicsBanner">
+        <label class="physics-toggle-main">
+            <input type="checkbox" id="physicsMainToggle">
+            <div class="toggle-slider"></div>
+            <span>⚛️ Advanced Physics Engine</span>
+        </label>
+        <div class="physics-status" id="physicsStatus">
+            <span class="status-dot"></span>
+            <span id="physicsStatusText">Disabled</span>
+        </div>
     </div>
     
     <!-- Information Panel -->
@@ -37,30 +349,43 @@
             
             <h2>Physical Properties</h2>
             <p>Radius: 25,559 km (4× Earth)</p>
-            <p>Mass: 14.5× Earth</p>
+            <p>Mass: 14.5× Earth (8.681×10²⁵ kg)</p>
             <p>Rotation: 17.24 hours (retrograde)</p>
             <p>Axial Tilt: 97.77° (sideways!)</p>
             <p>Orbital Period: 84 Earth years</p>
+            <p>Gravity: 8.87 m/s² (0.9× Earth)</p>
             
             <h2>Atmosphere</h2>
             <p>82.5% Hydrogen, 15.2% Helium</p>
             <p>2.3% Methane (creates blue color)</p>
             <p>Temperature: -224°C (coldest planet)</p>
+            <p>Wind speeds: Up to 900 km/h</p>
             
             <h2>Ring System</h2>
             <p>• 13 rings discovered in 1977</p>
             <p>• ε (Epsilon) ring: brightest and densest</p>
             <p>• Extremely dark (2-5% reflectivity)</p>
             <p>• Particles: 20cm to 20m diameter</p>
+            <p>• Shepherd moons: Cordelia & Ophelia</p>
             
-            <h2>Major Moons</h2>
-            <p>Miranda, Ariel, Umbriel, Titania, Oberon</p>
-            <p>All tidally locked to Uranus</p>
+            <h2>Moon System</h2>
+            <p><strong>27 Known Moons:</strong></p>
+            <p>• 5 Major: Miranda, Ariel, Umbriel, Titania, Oberon</p>
+            <p>• 13 Inner: Including Puck, Cordelia, Ophelia</p>
+            <p>• 9 Irregular: Retrograde & distant orbits</p>
+            <p>All major moons are tidally locked</p>
             
             <h2>Unique Features</h2>
             <p>• Only planet rolling on its side</p>
             <p>• 42-year polar seasons</p>
             <p>• Magnetosphere offset by 1/3 radius</p>
+            <p>• Magnetic field tilted 58.6° from axis</p>
+            <p>• Possible subsurface oceans on large moons</p>
+            
+            <h2>Exploration</h2>
+            <p>• Discovered: 1781 by William Herschel</p>
+            <p>• Visited: Voyager 2 (1986)</p>
+            <p>• Future: Proposed orbiter missions</p>
         </div>
     </div>
     
@@ -172,6 +497,26 @@
         </div>
     </div>
     
+    <!-- Physics Indicators -->
+    <div id="physics-indicators" class="physics-indicators">
+        <div class="indicator-item">
+            <span class="label">Physics:</span>
+            <span class="value" id="physicsMode">OFF</span>
+        </div>
+        <div class="indicator-item">
+            <span class="label">Bodies:</span>
+            <span class="value" id="bodyCount">28</span>
+        </div>
+        <div class="indicator-item">
+            <span class="label">Method:</span>
+            <span class="value" id="integrationMethod">N/A</span>
+        </div>
+        <div class="indicator-item">
+            <span class="label">Resonances:</span>
+            <span class="value" id="resonanceCount">0</span>
+        </div>
+    </div>
+    
     <!-- Coordinates Panel -->
     <div id="coordinates-panel">
         <div><strong>Camera Position</strong></div>
@@ -183,7 +528,7 @@
         <div>Elevation: <span id="camElevation">0</span>°</div>
     </div>
     
-    <!-- Quick Toggle Buttons -->
+    <!-- Enhanced Quick Toggle Buttons -->
     <div class="quick-toggle">
         <button id="quickRings" class="active" title="Toggle Rings">⭕</button>
         <button id="quickMoons" class="active" title="Toggle Moons">🌙</button>
@@ -191,6 +536,24 @@
         <button id="quickMag" title="Toggle Magnetosphere">🧲</button>
         <button id="quickLabels" class="active" title="Toggle Labels">📝</button>
         <button id="quickAxes" title="Toggle Axes">📐</button>
+        <div class="separator"></div>
+        <button id="quickPhysics" title="Toggle Physics">⚛️</button>
+    </div>
+    
+    <!-- Experiment Buttons (Hidden by default, shown when physics enabled) -->
+    <div class="experiment-buttons" id="experimentButtons" style="display: none;">
+        <button class="experiment-btn" id="launchParticleBtn" title="Launch a test particle">
+            🚀 Launch Particle
+        </button>
+        <button class="experiment-btn" id="showLagrangeBtn" title="Show Lagrange points">
+            📍 L-Points
+        </button>
+        <button class="experiment-btn" id="showGravityBtn" title="Visualize gravity field">
+            🌊 Gravity Field
+        </button>
+        <button class="experiment-btn" id="tidalStressBtn" title="Show tidal stress">
+            💫 Tidal Stress
+        </button>
     </div>
     
     <!-- Moon Info Tooltip -->
@@ -201,7 +564,7 @@
     </div>
     
     <!-- Help Button -->
-    <button id="help-button" title="Help">?</button>
+    <button id="help-button" title="Help & Tutorial">?</button>
     
     <!-- Axis Helper Legend -->
     <div class="axis-helper" style="display: none;">
@@ -210,7 +573,129 @@
         <span style="color: #0080ff;">Z (Blue)</span>
     </div>
     
+    <!-- Tutorial Overlay -->
+    <div class="tutorial-overlay" id="tutorialOverlay">
+        <div class="tutorial-content">
+            <button class="tutorial-close" id="tutorialClose">×</button>
+            <h2>🌌 Welcome to Uranus System Simulation</h2>
+            <ul>
+                <li><strong>Navigation:</strong> Left-click & drag to rotate, scroll to zoom</li>
+                <li><strong>Physics Engine:</strong> Toggle for realistic N-body gravity simulation</li>
+                <li><strong>27 Moons:</strong> All known moons with accurate orbits</li>
+                <li><strong>Ring System:</strong> 13 rings including the bright ε ring</li>
+                <li><strong>Experiments:</strong> Launch particles, explore Lagrange points</li>
+                <li><strong>Time Control:</strong> Speed up, slow down, or reverse time</li>
+                <li><strong>Magnetosphere:</strong> See the tilted magnetic field</li>
+            </ul>
+            <p style="text-align: center; margin-top: 20px;">
+                <button class="control-button" onclick="document.getElementById('tutorialOverlay').style.display='none'">
+                    Start Exploring
+                </button>
+            </p>
+        </div>
+    </div>
+    
     <!-- JavaScript Modules -->
-    <script type="module" src="js/main.js"></script>
+    <script type="module">
+        // Initialize main simulation
+        import('./js/main.js').then(() => {
+            console.log('Main simulation loaded');
+        });
+        
+        // Physics toggle handler
+        document.getElementById('physicsMainToggle').addEventListener('change', (e) => {
+            const isEnabled = e.target.checked;
+            const statusEl = document.getElementById('physicsStatus');
+            const statusText = document.getElementById('physicsStatusText');
+            const indicators = document.getElementById('physics-indicators');
+            const experiments = document.getElementById('experimentButtons');
+            const quickPhysics = document.getElementById('quickPhysics');
+            
+            if (isEnabled) {
+                statusEl.classList.add('active');
+                statusText.textContent = 'Initializing...';
+                indicators.classList.add('visible');
+                experiments.style.display = 'flex';
+                quickPhysics.classList.add('active');
+                
+                // Load physics engine dynamically
+                import('./js/ui/PhysicsPanel.js').then(module => {
+                    if (window.UranusSimulation) {
+                        module.integratePhysicsEngine(window.UranusSimulation);
+                        statusText.textContent = 'Active';
+                        document.getElementById('physicsMode').textContent = 'N-BODY';
+                    }
+                });
+            } else {
+                statusEl.classList.remove('active');
+                statusText.textContent = 'Disabled';
+                indicators.classList.remove('visible');
+                experiments.style.display = 'none';
+                quickPhysics.classList.remove('active');
+                document.getElementById('physicsMode').textContent = 'OFF';
+                
+                // Disable physics in simulation
+                if (window.UranusSimulation?.physicsEngine) {
+                    window.UranusSimulation.physicsEngine.setEnabled(false);
+                }
+            }
+        });
+        
+        // Quick physics toggle
+        document.getElementById('quickPhysics').addEventListener('click', () => {
+            const mainToggle = document.getElementById('physicsMainToggle');
+            mainToggle.checked = !mainToggle.checked;
+            mainToggle.dispatchEvent(new Event('change'));
+        });
+        
+        // Experiment buttons
+        document.getElementById('launchParticleBtn')?.addEventListener('click', () => {
+            if (window.UranusSimulation?.physicsPanel) {
+                window.UranusSimulation.physicsPanel.launchTestParticle();
+            }
+        });
+        
+        document.getElementById('showLagrangeBtn')?.addEventListener('click', function() {
+            this.classList.toggle('active');
+            if (window.UranusSimulation?.physicsEngine) {
+                const isActive = this.classList.contains('active');
+                window.UranusSimulation.physicsEngine.lagrangePoints.setVisible(isActive);
+            }
+        });
+        
+        document.getElementById('showGravityBtn')?.addEventListener('click', function() {
+            this.classList.toggle('active');
+            if (window.UranusSimulation?.physicsEngine) {
+                const isActive = this.classList.contains('active');
+                window.UranusSimulation.physicsEngine.gravityVisualizer.setEnabled(isActive);
+            }
+        });
+        
+        document.getElementById('tidalStressBtn')?.addEventListener('click', function() {
+            this.classList.toggle('active');
+            if (window.UranusSimulation?.physicsEngine) {
+                const isActive = this.classList.contains('active');
+                // Toggle tidal stress visualization
+            }
+        });
+        
+        // Show tutorial on first visit
+        if (!localStorage.getItem('uranusSimTutorialShown')) {
+            setTimeout(() => {
+                document.getElementById('tutorialOverlay').style.display = 'block';
+                localStorage.setItem('uranusSimTutorialShown', 'true');
+            }, 2000);
+        }
+        
+        // Tutorial close button
+        document.getElementById('tutorialClose').addEventListener('click', () => {
+            document.getElementById('tutorialOverlay').style.display = 'none';
+        });
+        
+        // Help button shows tutorial
+        document.getElementById('help-button').addEventListener('click', () => {
+            document.getElementById('tutorialOverlay').style.display = 'block';
+        });
+    </script>
 </body>
 </html>
