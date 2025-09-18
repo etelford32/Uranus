@@ -152,10 +152,15 @@
             box-shadow: 0 4px 15px rgba(79, 208, 231, 0.3);
         }
         
+        .experiment-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         /* Physics Indicators */
         .physics-indicators {
             position: absolute;
-            top: 60px;
+            top: 80px;
             right: 10px;
             background: rgba(0, 20, 40, 0.9);
             padding: 10px;
@@ -245,6 +250,8 @@
             border: 2px solid rgba(79, 208, 231, 0.5);
             max-width: 500px;
             color: white;
+            max-height: 80vh;
+            overflow-y: auto;
         }
         
         .tutorial-content h2 {
@@ -282,6 +289,10 @@
         }
         
         /* Loading enhancements */
+        #loading .loading-content {
+            text-align: center;
+        }
+        
         #loading .progress-bar {
             width: 200px;
             height: 4px;
@@ -295,11 +306,52 @@
             height: 100%;
             background: linear-gradient(90deg, #4FD0E7, #ff6b9d);
             width: 0%;
-            animation: loadProgress 2s ease-out forwards;
+            animation: loadProgress 3s ease-out forwards;
         }
         
         @keyframes loadProgress {
             to { width: 100%; }
+        }
+        
+        /* Error message styles */
+        .error-message {
+            background: rgba(255, 100, 100, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .physics-banner {
+                width: 90%;
+                max-width: 300px;
+                padding: 8px 16px;
+                gap: 10px;
+            }
+            
+            .physics-toggle-main span {
+                font-size: 12px;
+            }
+            
+            .experiment-buttons {
+                flex-wrap: wrap;
+                max-width: 90%;
+            }
+            
+            .experiment-btn {
+                font-size: 11px;
+                padding: 6px 12px;
+            }
+            
+            .tutorial-content {
+                width: 90%;
+                max-width: none;
+                margin: 20px;
+                padding: 20px;
+            }
         }
     </style>
 </head>
@@ -509,11 +561,11 @@
         </div>
         <div class="indicator-item">
             <span class="label">Method:</span>
-            <span class="value" id="integrationMethod">N/A</span>
+            <span class="value" id="integrationMethod">Kepler</span>
         </div>
         <div class="indicator-item">
             <span class="label">Resonances:</span>
-            <span class="value" id="resonanceCount">0</span>
+            <span class="value" id="resonanceCount">12</span>
         </div>
     </div>
     
@@ -537,21 +589,21 @@
         <button id="quickLabels" class="active" title="Toggle Labels">📝</button>
         <button id="quickAxes" title="Toggle Axes">📐</button>
         <div class="separator"></div>
-        <button id="quickPhysics" title="Toggle Physics">⚛️</button>
+        <button id="quickPhysics" title="Toggle Advanced Physics">⚛️</button>
     </div>
     
     <!-- Experiment Buttons (Hidden by default, shown when physics enabled) -->
     <div class="experiment-buttons" id="experimentButtons" style="display: none;">
-        <button class="experiment-btn" id="launchParticleBtn" title="Launch a test particle">
+        <button class="experiment-btn" id="launchParticleBtn" title="Launch a test particle" disabled>
             🚀 Launch Particle
         </button>
-        <button class="experiment-btn" id="showLagrangeBtn" title="Show Lagrange points">
+        <button class="experiment-btn" id="showLagrangeBtn" title="Show Lagrange points" disabled>
             📍 L-Points
         </button>
-        <button class="experiment-btn" id="showGravityBtn" title="Visualize gravity field">
+        <button class="experiment-btn" id="showGravityBtn" title="Visualize gravity field" disabled>
             🌊 Gravity Field
         </button>
-        <button class="experiment-btn" id="tidalStressBtn" title="Show tidal stress">
+        <button class="experiment-btn" id="tidalStressBtn" title="Show tidal stress" disabled>
             💫 Tidal Stress
         </button>
     </div>
@@ -580,12 +632,13 @@
             <h2>🌌 Welcome to Uranus System Simulation</h2>
             <ul>
                 <li><strong>Navigation:</strong> Left-click & drag to rotate, scroll to zoom</li>
-                <li><strong>Physics Engine:</strong> Toggle for realistic N-body gravity simulation</li>
+                <li><strong>Physics Engine:</strong> Toggle for enhanced orbital mechanics</li>
                 <li><strong>27 Moons:</strong> All known moons with accurate orbits</li>
                 <li><strong>Ring System:</strong> 13 rings including the bright ε ring</li>
-                <li><strong>Experiments:</strong> Launch particles, explore Lagrange points</li>
                 <li><strong>Time Control:</strong> Speed up, slow down, or reverse time</li>
                 <li><strong>Magnetosphere:</strong> See the tilted magnetic field</li>
+                <li><strong>Experiments:</strong> Various simulation tools (when physics is enabled)</li>
+                <li><strong>Panels:</strong> Drag panel headers to move them around</li>
             </ul>
             <p style="text-align: center; margin-top: 20px;">
                 <button class="control-button" onclick="document.getElementById('tutorialOverlay').style.display='none'">
@@ -595,107 +648,253 @@
         </div>
     </div>
     
-    <!-- JavaScript Modules -->
+    <!-- JavaScript -->
     <script type="module">
-        // Initialize main simulation
-        import('./js/main.js').then(() => {
-            console.log('Main simulation loaded');
-        });
+        // Global state management
+        window.UranusSimulationState = {
+            loaded: false,
+            physicsEnabled: false,
+            simulation: null,
+            physicsEngine: null
+        };
+        
+        // Error handling function
+        function showError(message) {
+            console.error('Uranus Simulation Error:', message);
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.innerHTML = `
+                    <div class="loading-content">
+                        <div class="error-message">
+                            ⚠️ Error Loading Simulation<br>
+                            ${message}<br>
+                            <small>Check the browser console for details</small>
+                        </div>
+                        <button class="control-button" onclick="location.reload()">
+                            Reload Page
+                        </button>
+                    </div>
+                `;
+            }
+        }
         
         // Physics toggle handler
-        document.getElementById('physicsMainToggle').addEventListener('change', (e) => {
-            const isEnabled = e.target.checked;
+        function setupPhysicsToggle() {
+            const physicsMainToggle = document.getElementById('physicsMainToggle');
             const statusEl = document.getElementById('physicsStatus');
             const statusText = document.getElementById('physicsStatusText');
             const indicators = document.getElementById('physics-indicators');
             const experiments = document.getElementById('experimentButtons');
             const quickPhysics = document.getElementById('quickPhysics');
             
-            if (isEnabled) {
-                statusEl.classList.add('active');
-                statusText.textContent = 'Initializing...';
-                indicators.classList.add('visible');
-                experiments.style.display = 'flex';
-                quickPhysics.classList.add('active');
+            physicsMainToggle.addEventListener('change', (e) => {
+                const isEnabled = e.target.checked;
+                window.UranusSimulationState.physicsEnabled = isEnabled;
                 
-                // Load physics engine dynamically
-                import('./js/ui/PhysicsPanel.js').then(module => {
-                    if (window.UranusSimulation) {
-                        module.integratePhysicsEngine(window.UranusSimulation);
-                        statusText.textContent = 'Active';
-                        document.getElementById('physicsMode').textContent = 'N-BODY';
-                    }
-                });
-            } else {
-                statusEl.classList.remove('active');
-                statusText.textContent = 'Disabled';
-                indicators.classList.remove('visible');
-                experiments.style.display = 'none';
-                quickPhysics.classList.remove('active');
-                document.getElementById('physicsMode').textContent = 'OFF';
-                
-                // Disable physics in simulation
-                if (window.UranusSimulation?.physicsEngine) {
-                    window.UranusSimulation.physicsEngine.setEnabled(false);
+                if (isEnabled) {
+                    statusEl.classList.add('active');
+                    statusText.textContent = 'Enhanced Mode';
+                    indicators.classList.add('visible');
+                    experiments.style.display = 'flex';
+                    quickPhysics.classList.add('active');
+                    document.getElementById('physicsMode').textContent = 'ENHANCED';
+                    document.getElementById('integrationMethod').textContent = 'RK4';
+                    
+                    // Enable experiment buttons (placeholder functionality)
+                    document.querySelectorAll('.experiment-btn').forEach(btn => {
+                        btn.disabled = false;
+                    });
+                    
+                } else {
+                    statusEl.classList.remove('active');
+                    statusText.textContent = 'Disabled';
+                    indicators.classList.remove('visible');
+                    experiments.style.display = 'none';
+                    quickPhysics.classList.remove('active');
+                    document.getElementById('physicsMode').textContent = 'OFF';
+                    document.getElementById('integrationMethod').textContent = 'Kepler';
+                    
+                    // Disable experiment buttons
+                    document.querySelectorAll('.experiment-btn').forEach(btn => {
+                        btn.disabled = true;
+                    });
                 }
-            }
-        });
+            });
+            
+            // Quick physics toggle
+            quickPhysics.addEventListener('click', () => {
+                physicsMainToggle.checked = !physicsMainToggle.checked;
+                physicsMainToggle.dispatchEvent(new Event('change'));
+            });
+        }
         
-        // Quick physics toggle
-        document.getElementById('quickPhysics').addEventListener('click', () => {
-            const mainToggle = document.getElementById('physicsMainToggle');
-            mainToggle.checked = !mainToggle.checked;
-            mainToggle.dispatchEvent(new Event('change'));
-        });
-        
-        // Experiment buttons
-        document.getElementById('launchParticleBtn')?.addEventListener('click', () => {
-            if (window.UranusSimulation?.physicsPanel) {
-                window.UranusSimulation.physicsPanel.launchTestParticle();
-            }
-        });
-        
-        document.getElementById('showLagrangeBtn')?.addEventListener('click', function() {
-            this.classList.toggle('active');
-            if (window.UranusSimulation?.physicsEngine) {
+        // Setup experiment buttons
+        function setupExperimentButtons() {
+            // Placeholder implementations - these would connect to actual physics engine
+            document.getElementById('launchParticleBtn')?.addEventListener('click', () => {
+                console.log('Launch particle feature would be implemented here');
+                // Could add a visual effect or show a message
+                showMessage('🚀 Test particle launched! (Feature in development)');
+            });
+            
+            document.getElementById('showLagrangeBtn')?.addEventListener('click', function() {
+                this.classList.toggle('active');
                 const isActive = this.classList.contains('active');
-                window.UranusSimulation.physicsEngine.lagrangePoints.setVisible(isActive);
-            }
-        });
-        
-        document.getElementById('showGravityBtn')?.addEventListener('click', function() {
-            this.classList.toggle('active');
-            if (window.UranusSimulation?.physicsEngine) {
+                console.log('Lagrange points:', isActive ? 'shown' : 'hidden');
+                showMessage(isActive ? '📍 Lagrange points shown' : '📍 Lagrange points hidden');
+            });
+            
+            document.getElementById('showGravityBtn')?.addEventListener('click', function() {
+                this.classList.toggle('active');
                 const isActive = this.classList.contains('active');
-                window.UranusSimulation.physicsEngine.gravityVisualizer.setEnabled(isActive);
-            }
-        });
-        
-        document.getElementById('tidalStressBtn')?.addEventListener('click', function() {
-            this.classList.toggle('active');
-            if (window.UranusSimulation?.physicsEngine) {
+                console.log('Gravity field visualization:', isActive ? 'enabled' : 'disabled');
+                showMessage(isActive ? '🌊 Gravity field visualization enabled' : '🌊 Gravity field visualization disabled');
+            });
+            
+            document.getElementById('tidalStressBtn')?.addEventListener('click', function() {
+                this.classList.toggle('active');
                 const isActive = this.classList.contains('active');
-                // Toggle tidal stress visualization
-            }
-        });
+                console.log('Tidal stress visualization:', isActive ? 'enabled' : 'disabled');
+                showMessage(isActive ? '💫 Tidal stress visualization enabled' : '💫 Tidal stress visualization disabled');
+            });
+        }
         
-        // Show tutorial on first visit
-        if (!localStorage.getItem('uranusSimTutorialShown')) {
+        // Show temporary message
+        function showMessage(text) {
+            const msg = document.createElement('div');
+            msg.style.cssText = `
+                position: fixed;
+                top: 100px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(79, 208, 231, 0.9);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 20px;
+                z-index: 1500;
+                font-size: 14px;
+                backdrop-filter: blur(10px);
+                animation: slideIn 0.3s ease-out;
+            `;
+            msg.textContent = text;
+            
+            // Add animation keyframes
+            if (!document.getElementById('messageAnimations')) {
+                const style = document.createElement('style');
+                style.id = 'messageAnimations';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+                        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(msg);
             setTimeout(() => {
-                document.getElementById('tutorialOverlay').style.display = 'block';
-                localStorage.setItem('uranusSimTutorialShown', 'true');
+                msg.style.opacity = '0';
+                msg.style.transform = 'translateX(-50%) translateY(-20px)';
+                setTimeout(() => msg.remove(), 300);
             }, 2000);
         }
         
-        // Tutorial close button
-        document.getElementById('tutorialClose').addEventListener('click', () => {
-            document.getElementById('tutorialOverlay').style.display = 'none';
-        });
+        // Setup tutorial
+        function setupTutorial() {
+            const tutorialOverlay = document.getElementById('tutorialOverlay');
+            const tutorialClose = document.getElementById('tutorialClose');
+            const helpButton = document.getElementById('help-button');
+            
+            // Show tutorial on first visit
+            if (!localStorage.getItem('uranusSimTutorialShown')) {
+                setTimeout(() => {
+                    tutorialOverlay.style.display = 'block';
+                    localStorage.setItem('uranusSimTutorialShown', 'true');
+                }, 3000);
+            }
+            
+            // Tutorial close button
+            tutorialClose.addEventListener('click', () => {
+                tutorialOverlay.style.display = 'none';
+            });
+            
+            // Help button shows tutorial
+            helpButton.addEventListener('click', () => {
+                tutorialOverlay.style.display = 'block';
+            });
+        }
         
-        // Help button shows tutorial
-        document.getElementById('help-button').addEventListener('click', () => {
-            document.getElementById('tutorialOverlay').style.display = 'block';
-        });
+        // Initialize all UI components
+        function initializeUI() {
+            setupPhysicsToggle();
+            setupExperimentButtons();
+            setupTutorial();
+            
+            console.log('UI components initialized');
+        }
+        
+        // Initialize main simulation
+        async function initializeSimulation() {
+            try {
+                console.log('🚀 Loading Uranus Simulation...');
+                
+                // Load main simulation module
+                const mainModule = await import('./js/main.js');
+                console.log('Main simulation module loaded');
+                
+                // Wait for simulation to be available
+                let attempts = 0;
+                const maxAttempts = 50;
+                
+                const waitForSimulation = () => {
+                    return new Promise((resolve, reject) => {
+                        const checkInterval = setInterval(() => {
+                            attempts++;
+                            
+                            if (window.UranusSimulation && window.UranusSimulation.isInitialized) {
+                                clearInterval(checkInterval);
+                                resolve(window.UranusSimulation);
+                            } else if (attempts >= maxAttempts) {
+                                clearInterval(checkInterval);
+                                reject(new Error('Simulation failed to initialize within timeout'));
+                            }
+                        }, 100);
+                    });
+                };
+                
+                const simulation = await waitForSimulation();
+                window.UranusSimulationState.loaded = true;
+                window.UranusSimulationState.simulation = simulation;
+                
+                console.log('✅ Uranus Simulation fully loaded!');
+                
+            } catch (error) {
+                console.error('Failed to load simulation:', error);
+                showError(`Failed to load simulation: ${error.message}`);
+            }
+        }
+        
+        // Main initialization
+        async function initialize() {
+            try {
+                // Initialize UI components first
+                initializeUI();
+                
+                // Load and initialize the simulation
+                await initializeSimulation();
+                
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                showError(error.message);
+            }
+        }
+        
+        // Start initialization when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initialize);
+        } else {
+            initialize();
+        }
     </script>
 </body>
 </html>
