@@ -4,193 +4,270 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Interactive 3D simulation of Uranus and its moons with advanced physics">
-    <meta name="keywords" content="Uranus, astronomy, physics, simulation, moons, rings, gravity">
-    <meta name="author" content="Uranus Simulation">
-    
     <title>Uranus System - Advanced Physics Simulation</title>
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛢</text></svg>">
     
-    <!-- Stylesheets -->
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/ui-panels.css">
-    
     <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <!-- Additional styles for physics features -->
     <style>
-        /* Physics Engine Styles */
-        .physics-banner {
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            user-select: none;
+        }
+
+        /* Canvas Container */
+        #canvas-container {
             position: absolute;
-            top: 10px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Loading Screen */
+        #loading {
+            position: absolute;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #4FD0E7;
+            text-align: center;
+            pointer-events: none;
             z-index: 1000;
-            background: linear-gradient(135deg, rgba(255, 107, 157, 0.9), rgba(79, 208, 231, 0.9));
-            padding: 12px 24px;
-            border-radius: 30px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .spinner {
+            border: 3px solid rgba(79, 208, 231, 0.3);
+            border-top: 3px solid #4FD0E7;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(79, 208, 231, 0.2);
+            border-radius: 2px;
+            margin: 20px auto;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4FD0E7, #ff6b9d);
+            width: 0%;
+            animation: loadProgress 3s ease-out forwards;
+        }
+
+        @keyframes loadProgress {
+            to { width: 100%; }
+        }
+
+        /* UI Panels */
+        .ui-panel {
+            position: absolute;
+            background: rgba(0, 20, 40, 0.9);
+            border-radius: 10px;
+            border: 1px solid rgba(79, 208, 231, 0.3);
             backdrop-filter: blur(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            z-index: 200;
+        }
+
+        .ui-panel.minimized {
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 10px 15px;
+            cursor: move;
+            background: rgba(79, 208, 231, 0.1);
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(79, 208, 231, 0.2);
+        }
+
+        .panel-header h1, .panel-header h3 {
+            color: #4FD0E7;
+            margin: 0;
+            text-shadow: 0 0 10px rgba(79, 208, 231, 0.5);
+            pointer-events: none;
+        }
+
+        .panel-btn {
+            width: 20px;
+            height: 20px;
+            border: none;
+            background: rgba(79, 208, 231, 0.2);
+            color: #4FD0E7;
+            border-radius: 4px;
+            cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 15px;
+            justify-content: center;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .panel-btn:hover {
+            background: rgba(79, 208, 231, 0.4);
+            transform: scale(1.1);
+        }
+
+        .panel-content {
+            padding: 15px;
+            max-height: 500px;
+            overflow-y: auto;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
-        .physics-banner:hover {
-            transform: translateX(-50%) translateY(-2px);
-            box-shadow: 0 6px 30px rgba(79, 208, 231, 0.4);
-        }
-        
-        .physics-toggle-main {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-        }
-        
-        .physics-toggle-main input[type="checkbox"] {
-            width: 0;
-            height: 0;
+
+        .minimized .panel-content {
+            max-height: 0;
+            padding: 0 15px;
             opacity: 0;
-            position: absolute;
         }
-        
-        .physics-toggle-main .toggle-slider {
-            width: 50px;
-            height: 26px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 13px;
-            position: relative;
-            transition: background 0.3s;
+
+        /* Info Panel */
+        #info-panel {
+            top: 10px;
+            left: 10px;
+            width: 300px;
         }
-        
-        .physics-toggle-main .toggle-slider::after {
-            content: '';
-            position: absolute;
-            width: 22px;
-            height: 22px;
-            background: white;
-            border-radius: 50%;
-            top: 2px;
-            left: 2px;
-            transition: transform 0.3s;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+        #info-panel h1 {
+            font-size: 20px;
         }
-        
-        .physics-toggle-main input:checked + .toggle-slider {
-            background: rgba(255, 255, 255, 0.4);
-        }
-        
-        .physics-toggle-main input:checked + .toggle-slider::after {
-            transform: translateX(24px);
-        }
-        
-        .physics-toggle-main span {
-            color: white;
-            font-weight: bold;
+
+        #info-panel h2 {
+            color: #6FE5F5;
             font-size: 14px;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            margin-top: 15px;
+            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(79, 208, 231, 0.3);
+            padding-bottom: 3px;
         }
-        
-        .physics-status {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding: 4px 12px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 15px;
-            font-size: 11px;
-            color: white;
+
+        #info-panel p {
+            font-size: 12px;
+            line-height: 1.4;
+            color: #b0d0e0;
+            margin: 3px 0;
         }
-        
-        .physics-status .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #ff4444;
-            animation: pulse 2s infinite;
-        }
-        
-        .physics-status.active .status-dot {
-            background: #44ff44;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        /* Experiment Buttons */
-        .experiment-buttons {
-            position: absolute;
+
+        /* Controls Panel */
+        #controls-panel {
             bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
-            z-index: 100;
+            left: 10px;
+            width: 320px;
         }
-        
-        .experiment-btn {
-            background: rgba(0, 20, 40, 0.9);
-            border: 1px solid rgba(79, 208, 231, 0.3);
-            color: #4FD0E7;
+
+        .control-group {
+            margin: 10px 0;
+        }
+
+        .control-group label {
+            display: inline-block;
+            width: 120px;
+            font-size: 12px;
+            color: #b0d0e0;
+        }
+
+        .control-group input[type="range"] {
+            width: 150px;
+            vertical-align: middle;
+        }
+
+        .control-group input[type="checkbox"] {
+            margin-left: 5px;
+        }
+
+        .control-group span {
+            color: #6FE5F5;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+
+        .control-button {
+            background: linear-gradient(135deg, #3FA0B5, #4FD0E7);
+            border: none;
+            color: white;
             padding: 8px 15px;
-            border-radius: 20px;
+            margin: 5px;
+            border-radius: 5px;
             cursor: pointer;
             font-size: 12px;
             transition: all 0.3s;
-            backdrop-filter: blur(10px);
         }
-        
-        .experiment-btn:hover {
-            background: rgba(79, 208, 231, 0.2);
+
+        .control-button:hover {
+            background: linear-gradient(135deg, #4FD0E7, #6FE5F5);
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(79, 208, 231, 0.3);
+            box-shadow: 0 5px 15px rgba(79, 208, 231, 0.3);
         }
-        
-        .experiment-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+
+        /* Stats Panel */
+        #stats-panel {
+            top: 10px;
+            right: 10px;
+            width: 200px;
         }
-        
-        /* Physics Indicators */
-        .physics-indicators {
+
+        #stats-panel .panel-content {
+            font-size: 12px;
+            color: #6FE5F5;
+        }
+
+        #stats-panel .stat-line {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Coordinates Panel */
+        #coordinates-panel {
             position: absolute;
-            top: 80px;
+            bottom: 10px;
             right: 10px;
             background: rgba(0, 20, 40, 0.9);
             padding: 10px;
             border-radius: 5px;
-            border: 1px solid rgba(79, 208, 231, 0.3);
+            font-family: 'Courier New', monospace;
             font-size: 11px;
             color: #6FE5F5;
-            display: none;
+            border: 1px solid rgba(79, 208, 231, 0.3);
+            backdrop-filter: blur(10px);
         }
-        
-        .physics-indicators.visible {
-            display: block;
+
+        #coordinates-panel div {
+            margin: 2px 0;
         }
-        
-        .indicator-item {
-            display: flex;
-            justify-content: space-between;
-            margin: 3px 0;
-        }
-        
-        .indicator-item .label {
-            color: #b0d0e0;
-        }
-        
-        .indicator-item .value {
-            color: #4FD0E7;
-            font-weight: bold;
-        }
-        
-        /* Enhanced Quick Toggle */
+
+        /* Quick Toggle Buttons */
         .quick-toggle {
             position: absolute;
             top: 50%;
@@ -205,152 +282,113 @@
             border: 1px solid rgba(79, 208, 231, 0.3);
             z-index: 100;
         }
-        
-        .quick-toggle .separator {
-            height: 1px;
-            background: rgba(79, 208, 231, 0.3);
-            margin: 2px 0;
-        }
-        
-        #quickPhysics {
-            background: linear-gradient(135deg, rgba(255, 107, 157, 0.3), rgba(79, 208, 231, 0.3));
-        }
-        
-        #quickPhysics.active {
-            background: linear-gradient(135deg, rgba(255, 107, 157, 0.6), rgba(79, 208, 231, 0.6));
-            animation: physicsGlow 2s infinite;
-        }
-        
-        @keyframes physicsGlow {
-            0%, 100% { box-shadow: 0 0 5px rgba(255, 107, 157, 0.5); }
-            50% { box-shadow: 0 0 15px rgba(79, 208, 231, 0.8); }
-        }
-        
-        /* Tutorial Overlay */
-        .tutorial-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            z-index: 2000;
-            backdrop-filter: blur(5px);
-        }
-        
-        .tutorial-content {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: linear-gradient(135deg, rgba(0, 20, 40, 0.95), rgba(20, 40, 60, 0.95));
-            padding: 30px;
-            border-radius: 15px;
-            border: 2px solid rgba(79, 208, 231, 0.5);
-            max-width: 500px;
-            color: white;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        
-        .tutorial-content h2 {
-            color: #4FD0E7;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .tutorial-content ul {
-            list-style: none;
-            padding: 0;
-        }
-        
-        .tutorial-content li {
-            margin: 10px 0;
-            padding-left: 25px;
-            position: relative;
-        }
-        
-        .tutorial-content li::before {
-            content: '✨';
-            position: absolute;
-            left: 0;
-        }
-        
-        .tutorial-close {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: none;
+
+        .quick-toggle button {
+            width: 30px;
+            height: 30px;
             border: none;
-            color: #4FD0E7;
-            font-size: 24px;
-            cursor: pointer;
-        }
-        
-        /* Loading enhancements */
-        #loading .loading-content {
-            text-align: center;
-        }
-        
-        #loading .progress-bar {
-            width: 200px;
-            height: 4px;
             background: rgba(79, 208, 231, 0.2);
-            border-radius: 2px;
-            margin: 20px auto;
-            overflow: hidden;
+            color: #4FD0E7;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
         }
-        
-        #loading .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #4FD0E7, #ff6b9d);
-            width: 0%;
-            animation: loadProgress 3s ease-out forwards;
+
+        .quick-toggle button:hover {
+            background: rgba(79, 208, 231, 0.4);
         }
-        
-        @keyframes loadProgress {
-            to { width: 100%; }
-        }
-        
-        /* Error message styles */
-        .error-message {
-            background: rgba(255, 100, 100, 0.9);
+
+        .quick-toggle button.active {
+            background: rgba(79, 208, 231, 0.6);
             color: white;
+        }
+
+        /* Help Button */
+        #help-button {
+            position: absolute;
+            bottom: 60px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3FA0B5, #4FD0E7);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+        }
+
+        #help-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 20px rgba(79, 208, 231, 0.5);
+        }
+
+        /* Moon Info */
+        #moon-info {
+            position: absolute;
+            bottom: 100px;
+            right: 10px;
+            background: rgba(0, 20, 40, 0.95);
             padding: 10px;
             border-radius: 5px;
-            margin: 10px 0;
-            text-align: center;
+            font-size: 11px;
+            max-width: 200px;
+            backdrop-filter: blur(10px);
+            display: none;
+            border: 1px solid rgba(79, 208, 231, 0.3);
+            pointer-events: none;
         }
-        
-        /* Mobile optimizations */
+
+        #moon-info.visible {
+            display: block;
+        }
+
+        #moon-info h3 {
+            color: #4FD0E7;
+            margin: 0 0 5px 0;
+        }
+
+        /* Message System */
+        .message {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(79, 208, 231, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1500;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* Mobile Optimizations */
         @media (max-width: 768px) {
-            .physics-banner {
-                width: 90%;
-                max-width: 300px;
-                padding: 8px 16px;
-                gap: 10px;
+            .ui-panel {
+                width: 280px !important;
             }
             
-            .physics-toggle-main span {
-                font-size: 12px;
+            #controls-panel {
+                width: 300px !important;
             }
             
-            .experiment-buttons {
-                flex-wrap: wrap;
-                max-width: 90%;
+            #stats-panel {
+                width: 180px !important;
             }
             
-            .experiment-btn {
-                font-size: 11px;
-                padding: 6px 12px;
-            }
-            
-            .tutorial-content {
-                width: 90%;
-                max-width: none;
-                margin: 20px;
-                padding: 20px;
+            .control-group input[type="range"] {
+                width: 120px;
             }
         }
     </style>
@@ -368,21 +406,8 @@
                 <div class="progress-fill"></div>
             </div>
             <div style="font-size: 12px; margin-top: 10px; opacity: 0.7;">
-                Loading 27 moons, 13 rings, and gravitational physics...
+                Self-contained simulation - no external dependencies
             </div>
-        </div>
-    </div>
-    
-    <!-- Physics Engine Banner -->
-    <div class="physics-banner" id="physicsBanner">
-        <label class="physics-toggle-main">
-            <input type="checkbox" id="physicsMainToggle">
-            <div class="toggle-slider"></div>
-            <span>⚛️ Advanced Physics Engine</span>
-        </label>
-        <div class="physics-status" id="physicsStatus">
-            <span class="status-dot"></span>
-            <span id="physicsStatusText">Disabled</span>
         </div>
     </div>
     
@@ -494,12 +519,6 @@
             </div>
             
             <div class="control-group">
-                <label>
-                    <input type="checkbox" id="showAxes"> Axis Helper
-                </label>
-            </div>
-            
-            <div class="control-group">
                 <label>Distance Scale:</label>
                 <input type="range" id="distanceScale" min="0.3" max="2" value="1" step="0.1">
                 <span id="distanceValue">1.0x</span>
@@ -549,26 +568,6 @@
         </div>
     </div>
     
-    <!-- Physics Indicators -->
-    <div id="physics-indicators" class="physics-indicators">
-        <div class="indicator-item">
-            <span class="label">Physics:</span>
-            <span class="value" id="physicsMode">OFF</span>
-        </div>
-        <div class="indicator-item">
-            <span class="label">Bodies:</span>
-            <span class="value" id="bodyCount">28</span>
-        </div>
-        <div class="indicator-item">
-            <span class="label">Method:</span>
-            <span class="value" id="integrationMethod">Kepler</span>
-        </div>
-        <div class="indicator-item">
-            <span class="label">Resonances:</span>
-            <span class="value" id="resonanceCount">12</span>
-        </div>
-    </div>
-    
     <!-- Coordinates Panel -->
     <div id="coordinates-panel">
         <div><strong>Camera Position</strong></div>
@@ -580,32 +579,13 @@
         <div>Elevation: <span id="camElevation">0</span>°</div>
     </div>
     
-    <!-- Enhanced Quick Toggle Buttons -->
+    <!-- Quick Toggle Buttons -->
     <div class="quick-toggle">
         <button id="quickRings" class="active" title="Toggle Rings">⭕</button>
         <button id="quickMoons" class="active" title="Toggle Moons">🌙</button>
         <button id="quickOrbits" class="active" title="Toggle Orbits">⚪</button>
         <button id="quickMag" title="Toggle Magnetosphere">🧲</button>
         <button id="quickLabels" class="active" title="Toggle Labels">📝</button>
-        <button id="quickAxes" title="Toggle Axes">📐</button>
-        <div class="separator"></div>
-        <button id="quickPhysics" title="Toggle Advanced Physics">⚛️</button>
-    </div>
-    
-    <!-- Experiment Buttons (Hidden by default, shown when physics enabled) -->
-    <div class="experiment-buttons" id="experimentButtons" style="display: none;">
-        <button class="experiment-btn" id="launchParticleBtn" title="Launch a test particle" disabled>
-            🚀 Launch Particle
-        </button>
-        <button class="experiment-btn" id="showLagrangeBtn" title="Show Lagrange points" disabled>
-            📍 L-Points
-        </button>
-        <button class="experiment-btn" id="showGravityBtn" title="Visualize gravity field" disabled>
-            🌊 Gravity Field
-        </button>
-        <button class="experiment-btn" id="tidalStressBtn" title="Show tidal stress" disabled>
-            💫 Tidal Stress
-        </button>
     </div>
     
     <!-- Moon Info Tooltip -->
@@ -618,59 +598,833 @@
     <!-- Help Button -->
     <button id="help-button" title="Help & Tutorial">?</button>
     
-    <!-- Axis Helper Legend -->
-    <div class="axis-helper" style="display: none;">
-        <span style="color: #ff0000;">X (Red)</span> |
-        <span style="color: #00ff00;">Y (Green)</span> |
-        <span style="color: #0080ff;">Z (Blue)</span>
-    </div>
-    
-    <!-- Tutorial Overlay -->
-    <div class="tutorial-overlay" id="tutorialOverlay">
-        <div class="tutorial-content">
-            <button class="tutorial-close" id="tutorialClose">×</button>
-            <h2>🌌 Welcome to Uranus System Simulation</h2>
-            <ul>
-                <li><strong>Navigation:</strong> Left-click & drag to rotate, scroll to zoom</li>
-                <li><strong>Physics Engine:</strong> Toggle for enhanced orbital mechanics</li>
-                <li><strong>27 Moons:</strong> All known moons with accurate orbits</li>
-                <li><strong>Ring System:</strong> 13 rings including the bright ε ring</li>
-                <li><strong>Time Control:</strong> Speed up, slow down, or reverse time</li>
-                <li><strong>Magnetosphere:</strong> See the tilted magnetic field</li>
-                <li><strong>Experiments:</strong> Various simulation tools (when physics is enabled)</li>
-                <li><strong>Panels:</strong> Drag panel headers to move them around</li>
-            </ul>
-            <p style="text-align: center; margin-top: 20px;">
-                <button class="control-button" onclick="document.getElementById('tutorialOverlay').style.display='none'">
-                    Start Exploring
-                </button>
-            </p>
-        </div>
-    </div>
-    
-    <!-- JavaScript -->
-    <script type="module">
-        // Global state management
-        window.UranusSimulationState = {
-            loaded: false,
-            physicsEnabled: false,
-            simulation: null,
-            physicsEngine: null
-        };
-        
-        // Error handling function
-        function showError(message) {
-            console.error('Uranus Simulation Error:', message);
-            const loading = document.getElementById('loading');
-            if (loading) {
-                loading.innerHTML = `
-                    <div class="loading-content">
-                        <div class="error-message">
-                            ⚠️ Error Loading Simulation<br>
-                            ${message}<br>
-                            <small>Check the browser console for details</small>
-                        </div>
-                        <button class="control-button" onclick="location.reload()">
+    <script>
+        // Complete Uranus Simulation - Self-contained
+        class UranusSimulation {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.uranus = null;
+                this.rings = [];
+                this.moons = [];
+                this.moonLabels = [];
+                this.orbits = [];
+                this.starfield = null;
+                this.magnetosphere = null;
+                
+                // Simulation state
+                this.isPaused = false;
+                this.timeSpeed = 1;
+                this.simulationTime = 0;
+                this.rotation = 0;
+                
+                // Camera controls
+                this.isMouseDown = false;
+                this.mouseButton = -1;
+                this.lastMouseX = 0;
+                this.lastMouseY = 0;
+                this.cameraDistance = 150;
+                this.cameraTheta = 0;
+                this.cameraPhi = Math.PI / 3;
+                
+                // Performance tracking
+                this.frameCount = 0;
+                this.lastFpsTime = performance.now();
+                this.currentFPS = 60;
+                
+                // Settings
+                this.settings = {
+                    showRings: true,
+                    showMoons: true,
+                    showOrbits: true,
+                    showMagnetosphere: false,
+                    showLabels: true,
+                    distanceScale: 1.0,
+                    moonScale: 2.0,
+                    ringShine: 0.7
+                };
+                
+                // Moon data - all 27 moons of Uranus
+                this.moonData = [
+                    // Inner moons
+                    { name: 'Cordelia', radius: 0.5, distance: 20, period: 8, color: 0x9a8a7a, info: 'Innermost moon, shepherd of ε ring' },
+                    { name: 'Ophelia', radius: 0.5, distance: 22, period: 9, color: 0x9a8a7a, info: 'Outer shepherd of ε ring' },
+                    { name: 'Bianca', radius: 0.6, distance: 24, period: 10, color: 0xa59585, info: 'Small inner moon' },
+                    { name: 'Cressida', radius: 0.8, distance: 25, period: 11, color: 0xa59585, info: 'Inner moon from Shakespeare' },
+                    { name: 'Desdemona', radius: 0.7, distance: 26, period: 11.4, color: 0xa59585, info: 'Named after Othello character' },
+                    { name: 'Juliet', radius: 0.9, distance: 27, period: 11.8, color: 0xa59585, info: 'Romeo and Juliet character' },
+                    { name: 'Portia', radius: 1.3, distance: 28, period: 12.3, color: 0xa59585, info: 'Largest inner moon' },
+                    { name: 'Rosalind', radius: 0.8, distance: 30, period: 13.4, color: 0xa59585, info: 'As You Like It character' },
+                    { name: 'Cupid', radius: 0.3, distance: 32, period: 14.7, color: 0x9a8a7a, info: 'Tiny inner moon' },
+                    { name: 'Belinda', radius: 0.8, distance: 33, period: 15, color: 0xa59585, info: 'The Rape of the Lock' },
+                    { name: 'Perdita', radius: 0.4, distance: 34, period: 15.3, color: 0x9a8a7a, info: 'Lost and found moon' },
+                    { name: 'Puck', radius: 1.6, distance: 37, period: 18.3, color: 0xb0a090, info: 'Largest inner moon' },
+                    { name: 'Mab', radius: 0.3, distance: 42, period: 22, color: 0x9a8a7a, info: 'Source of μ ring' },
+                    
+                    // Major moons
+                    { name: 'Miranda', radius: 4, distance: 55, period: 34, color: 0xc8b8a8, info: 'Extreme geological features, 20km cliffs' },
+                    { name: 'Ariel', radius: 6, distance: 80, period: 60, color: 0xd4c4b4, info: 'Brightest moon, youngest surface' },
+                    { name: 'Umbriel', radius: 6, distance: 110, period: 99, color: 0x7a6a5a, info: 'Darkest major moon' },
+                    { name: 'Titania', radius: 8, distance: 185, period: 209, color: 0xb8a898, info: 'Largest moon of Uranus' },
+                    { name: 'Oberon', radius: 8, distance: 250, period: 323, color: 0xa89888, info: 'Outermost major moon' },
+                    
+                    // Irregular moons (distant)
+                    { name: 'Francisco', radius: 0.2, distance: 400, period: -600, color: 0x6a5a4a, info: 'Retrograde irregular moon' },
+                    { name: 'Caliban', radius: 0.6, distance: 450, period: -800, color: 0x8a6050, info: 'Largest irregular moon' },
+                    { name: 'Stephano', radius: 0.3, distance: 500, period: -900, color: 0x6a5a4a, info: 'Retrograde moon' },
+                    { name: 'Trinculo', radius: 0.2, distance: 520, period: -950, color: 0x6a5a4a, info: 'High inclination orbit' },
+                    { name: 'Sycorax', radius: 0.8, distance: 600, period: -1200, color: 0x9a6050, info: 'Largest known irregular moon' },
+                    { name: 'Margaret', radius: 0.2, distance: 650, period: 1300, color: 0x6a5a4a, info: 'Only prograde irregular' },
+                    { name: 'Prospero', radius: 0.4, distance: 700, period: -1500, color: 0x7a5a4a, info: 'Distant retrograde' },
+                    { name: 'Setebos', radius: 0.4, distance: 750, period: -1600, color: 0x7a5a4a, info: 'Discovered 1999' },
+                    { name: 'Ferdinand', radius: 0.2, distance: 800, period: -1800, color: 0x6a5a4a, info: 'Most distant known moon' }
+                ];
+                
+                this.isInitialized = false;
+            }
+            
+            async init() {
+                try {
+                    console.log('🌌 Initializing Uranus Simulation...');
+                    
+                    this.setupScene();
+                    this.createUranus();
+                    this.createRings();
+                    this.createMoons();
+                    this.createStarfield();
+                    this.createMagnetosphere();
+                    this.setupControls();
+                    this.setupUI();
+                    
+                    // Start animation
+                    this.animate();
+                    
+                    // Hide loading screen
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                    }, 2000);
+                    
+                    this.isInitialized = true;
+                    console.log('✅ Uranus Simulation initialized successfully!');
+                    
+                } catch (error) {
+                    console.error('Failed to initialize simulation:', error);
+                    this.showError(error.message);
+                }
+            }
+            
+            setupScene() {
+                // Create scene
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x000822, 0.0002);
+                
+                // Create camera
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+                this.updateCameraPosition();
+                
+                // Create renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
+                
+                document.getElementById('canvas-container').appendChild(this.renderer.domElement);
+                
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0x1a1a3a, 0.4);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+                directionalLight.position.set(200, 100, 200);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                this.scene.add(directionalLight);
+                
+                const rimLight = new THREE.PointLight(0x4FD0E7, 0.5, 300);
+                rimLight.position.set(-50, 0, -50);
+                this.scene.add(rimLight);
+            }
+            
+            createUranus() {
+                const geometry = new THREE.SphereGeometry(10, 64, 32);
+                
+                // Add surface detail
+                const positions = geometry.attributes.position;
+                const vertex = new THREE.Vector3();
+                
+                for (let i = 0; i < positions.count; i++) {
+                    vertex.fromBufferAttribute(positions, i);
+                    const noise = (Math.sin(vertex.y * 3) * 0.02 + Math.cos(vertex.x * 5) * 0.01) * 0.1;
+                    vertex.normalize();
+                    vertex.multiplyScalar(10 + noise);
+                    positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
+                }
+                
+                positions.needsUpdate = true;
+                geometry.computeVertexNormals();
+                
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x4FD0E7,
+                    emissive: 0x0a2a3a,
+                    emissiveIntensity: 0.1,
+                    specular: 0x6FE5F5,
+                    shininess: 40,
+                    reflectivity: 0.3
+                });
+                
+                this.uranus = new THREE.Mesh(geometry, material);
+                this.uranus.castShadow = true;
+                this.uranus.receiveShadow = true;
+                this.uranus.rotation.z = 97.77 * Math.PI / 180; // Extreme axial tilt
+                this.scene.add(this.uranus);
+                
+                // Atmosphere glow
+                const glowGeometry = new THREE.SphereGeometry(12, 32, 16);
+                const glowMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        glowColor: { value: new THREE.Color(0x4FD0E7) }
+                    },
+                    vertexShader: `
+                        varying float intensity;
+                        void main() {
+                            vec3 vNormal = normalize(normalMatrix * normal);
+                            intensity = pow(0.7 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform vec3 glowColor;
+                        varying float intensity;
+                        void main() {
+                            vec3 glow = glowColor * intensity;
+                            gl_FragColor = vec4(glow, intensity * 0.1);
+                        }
+                    `,
+                    side: THREE.BackSide,
+                    blending: THREE.AdditiveBlending,
+                    transparent: true
+                });
+                
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                glow.rotation.z = 97.77 * Math.PI / 180;
+                this.scene.add(glow);
+            }
+            
+            createRings() {
+                // Ring system data
+                const ringsData = [
+                    { name: 'ζ', inner: 15, outer: 16, opacity: 0.4 },
+                    { name: '6', inner: 17, outer: 17.2, opacity: 0.6 },
+                    { name: '5', inner: 17.5, outer: 17.7, opacity: 0.6 },
+                    { name: '4', inner: 18, outer: 18.2, opacity: 0.6 },
+                    { name: 'α', inner: 18.8, outer: 19, opacity: 0.8 },
+                    { name: 'β', inner: 19.5, outer: 19.7, opacity: 0.8 },
+                    { name: 'η', inner: 20, outer: 20.1, opacity: 0.5 },
+                    { name: 'γ', inner: 20.2, outer: 20.3, opacity: 0.7 },
+                    { name: 'δ', inner: 20.5, outer: 20.7, opacity: 0.7 },
+                    { name: 'λ', inner: 21, outer: 21.1, opacity: 0.4 },
+                    { name: 'ε', inner: 21.5, outer: 22, opacity: 1.0 }, // Main ring
+                    { name: 'ν', inner: 28, outer: 30, opacity: 0.2 },
+                    { name: 'μ', inner: 36, outer: 43, opacity: 0.15 }
+                ];
+                
+                ringsData.forEach(ringData => {
+                    const geometry = new THREE.RingGeometry(ringData.inner, ringData.outer, 128, 1);
+                    
+                    let color = 0x808890;
+                    if (ringData.name === 'ε') color = 0xb0c0d0;
+                    else if (ringData.name === 'μ' || ringData.name === 'ν') color = 0x7a9aba;
+                    
+                    const material = new THREE.MeshBasicMaterial({
+                        color: color,
+                        transparent: true,
+                        opacity: ringData.opacity * 0.8,
+                        side: THREE.DoubleSide,
+                        depthWrite: false
+                    });
+                    
+                    const ring = new THREE.Mesh(geometry, material);
+                    ring.rotation.x = -Math.PI / 2;
+                    ring.rotation.z = 97.77 * Math.PI / 180; // Match Uranus tilt
+                    ring.userData = { name: ringData.name, baseOpacity: ringData.opacity };
+                    
+                    this.rings.push(ring);
+                    this.scene.add(ring);
+                });
+            }
+            
+            createMoons() {
+                this.moonData.forEach((moonData, index) => {
+                    // Create moon
+                    const geometry = new THREE.SphereGeometry(moonData.radius, 16, 8);
+                    const material = new THREE.MeshPhongMaterial({
+                        color: moonData.color,
+                        emissive: moonData.color,
+                        emissiveIntensity: 0.05
+                    });
+                    
+                    const moon = new THREE.Mesh(geometry, material);
+                    moon.name = moonData.name;
+                    moon.userData = { ...moonData, angle: Math.random() * Math.PI * 2, index };
+                    
+                    // Set initial position
+                    const distance = moonData.distance * this.settings.distanceScale;
+                    moon.position.x = Math.cos(moon.userData.angle) * distance;
+                    moon.position.z = Math.sin(moon.userData.angle) * distance;
+                    
+                    if (moonData.radius >= 4) { // Major moons
+                        moon.castShadow = true;
+                        moon.receiveShadow = true;
+                    }
+                    
+                    this.moons.push(moon);
+                    this.scene.add(moon);
+                    
+                    // Create orbit line
+                    const orbitGeometry = new THREE.RingGeometry(distance - 0.5, distance + 0.5, 64, 1);
+                    const orbitColor = moonData.radius >= 4 ? 0x6fa5c5 : 0x4080a0;
+                    const orbitMaterial = new THREE.MeshBasicMaterial({
+                        color: orbitColor,
+                        transparent: true,
+                        opacity: 0.3,
+                        side: THREE.DoubleSide
+                    });
+                    
+                    const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+                    orbit.rotation.x = -Math.PI / 2;
+                    orbit.userData = { moonName: moonData.name };
+                    
+                    this.orbits.push(orbit);
+                    this.scene.add(orbit);
+                    
+                    // Create label for major moons
+                    if (moonData.radius >= 4) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 256;
+                        canvas.height = 64;
+                        const ctx = canvas.getContext('2d');
+                        
+                        ctx.font = 'Bold 20px Arial';
+                        ctx.fillStyle = 'rgba(111, 229, 245, 0.9)';
+                        ctx.fillText(moonData.name, 10, 35);
+                        
+                        const texture = new THREE.CanvasTexture(canvas);
+                        const labelMaterial = new THREE.SpriteMaterial({
+                            map: texture,
+                            transparent: true,
+                            depthTest: false
+                        });
+                        
+                        const label = new THREE.Sprite(labelMaterial);
+                        label.scale.set(8, 2, 1);
+                        label.position.copy(moon.position);
+                        label.position.y += moonData.radius + 2;
+                        label.userData = { moonName: moonData.name };
+                        
+                        this.moonLabels.push(label);
+                        this.scene.add(label);
+                    }
+                });
+            }
+            
+            createStarfield() {
+                const geometry = new THREE.BufferGeometry();
+                const positions = [];
+                const colors = [];
+                const sizes = [];
+                
+                for (let i = 0; i < 10000; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(Math.random() * 2 - 1);
+                    const r = 2000 + Math.random() * 1000;
+                    
+                    positions.push(
+                        r * Math.sin(phi) * Math.cos(theta),
+                        r * Math.sin(phi) * Math.sin(theta),
+                        r * Math.cos(phi)
+                    );
+                    
+                    // Star colors
+                    const colorVar = Math.random();
+                    if (colorVar < 0.7) {
+                        colors.push(1, 1, 1); // White
+                    } else if (colorVar < 0.85) {
+                        colors.push(0.8, 0.8, 1); // Blue
+                    } else {
+                        colors.push(1, 0.8, 0.6); // Orange
+                    }
+                    
+                    sizes.push(0.5 + Math.random() * 1.5);
+                }
+                
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+                
+                const material = new THREE.PointsMaterial({
+                    size: 2,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                this.starfield = new THREE.Points(geometry, material);
+                this.scene.add(this.starfield);
+            }
+            
+            createMagnetosphere() {
+                const group = new THREE.Group();
+                
+                // Field lines
+                for (let i = 0; i < 6; i++) {
+                    const torusGeometry = new THREE.TorusGeometry(25 + i * 5, 0.2, 8, 50);
+                    const torusMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xff6b9d,
+                        transparent: true,
+                        opacity: 0.15,
+                        wireframe: true,
+                        blending: THREE.AdditiveBlending
+                    });
+                    
+                    const torus = new THREE.Mesh(torusGeometry, torusMaterial);
+                    torus.rotation.x = Math.PI / 2;
+                    torus.rotation.z = i * 0.2;
+                    group.add(torus);
+                }
+                
+                // Offset and tilt magnetosphere
+                group.position.y = -3; // Offset from planet center
+                group.rotation.x = 58.6 * Math.PI / 180; // Magnetic field tilt
+                group.rotation.z = 97.77 * Math.PI / 180; // Match Uranus tilt
+                group.visible = false;
+                
+                this.magnetosphere = group;
+                this.scene.add(group);
+            }
+            
+            setupControls() {
+                const canvas = this.renderer.domElement;
+                
+                // Mouse events
+                canvas.addEventListener('mousedown', (e) => {
+                    this.isMouseDown = true;
+                    this.mouseButton = e.button;
+                    this.lastMouseX = e.clientX;
+                    this.lastMouseY = e.clientY;
+                    canvas.style.cursor = 'grabbing';
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    this.isMouseDown = false;
+                    this.mouseButton = -1;
+                    canvas.style.cursor = 'grab';
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if (!this.isMouseDown) return;
+                    
+                    const deltaX = e.clientX - this.lastMouseX;
+                    const deltaY = e.clientY - this.lastMouseY;
+                    
+                    if (this.mouseButton === 0) { // Left button - rotate
+                        this.cameraTheta -= deltaX * 0.01;
+                        this.cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, this.cameraPhi + deltaY * 0.01));
+                        this.updateCameraPosition();
+                    } else if (this.mouseButton === 2) { // Right button - pan
+                        // Simple pan implementation
+                        const factor = this.cameraDistance * 0.001;
+                        this.camera.position.x += deltaX * factor;
+                        this.camera.position.y -= deltaY * factor;
+                    }
+                    
+                    this.lastMouseX = e.clientX;
+                    this.lastMouseY = e.clientY;
+                });
+                
+                // Wheel zoom
+                canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const scale = e.deltaY > 0 ? 1.1 : 0.9;
+                    this.cameraDistance = Math.max(30, Math.min(500, this.cameraDistance * scale));
+                    this.updateCameraPosition();
+                });
+                
+                // Prevent context menu
+                canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+                
+                // Touch controls for mobile
+                let touchDistance = 0;
+                canvas.addEventListener('touchstart', (e) => {
+                    if (e.touches.length === 2) {
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        touchDistance = Math.sqrt(dx * dx + dy * dy);
+                    }
+                });
+                
+                canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 2) {
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const scale = touchDistance / distance;
+                        this.cameraDistance = Math.max(30, Math.min(500, this.cameraDistance * scale));
+                        touchDistance = distance;
+                        this.updateCameraPosition();
+                    }
+                });
+                
+                // Window resize
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            setupUI() {
+                // Panel minimize buttons
+                document.querySelectorAll('.minimize-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const panel = btn.closest('.ui-panel');
+                        const isMinimized = panel.classList.toggle('minimized');
+                        btn.textContent = isMinimized ? '+' : '−';
+                    });
+                });
+                
+                // Time speed slider
+                const timeSpeedSlider = document.getElementById('timeSpeed');
+                timeSpeedSlider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    if (value < 0) {
+                        this.timeSpeed = Math.pow(10, value);
+                    } else {
+                        this.timeSpeed = Math.pow(10, value);
+                    }
+                    
+                    let displayText;
+                    if (this.timeSpeed < 1) {
+                        displayText = `${(this.timeSpeed * 3600).toFixed(1)} sec/sec`;
+                    } else {
+                        displayText = `${this.timeSpeed.toFixed(1)} hours/sec`;
+                    }
+                    document.getElementById('timeSpeedValue').textContent = displayText;
+                });
+                
+                // Control buttons
+                document.getElementById('pauseBtn').addEventListener('click', () => {
+                    this.isPaused = !this.isPaused;
+                    document.getElementById('pauseBtn').textContent = this.isPaused ? '▶ Play' : '⏸ Pause';
+                });
+                
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    this.cameraDistance = 150;
+                    this.cameraTheta = 0;
+                    this.cameraPhi = Math.PI / 3;
+                    this.updateCameraPosition();
+                });
+                
+                // Display toggles
+                const toggles = [
+                    { id: 'showRings', property: 'showRings', objects: this.rings },
+                    { id: 'showMoons', property: 'showMoons', objects: this.moons },
+                    { id: 'showOrbits', property: 'showOrbits', objects: this.orbits },
+                    { id: 'showLabels', property: 'showLabels', objects: this.moonLabels }
+                ];
+                
+                toggles.forEach(({ id, property, objects }) => {
+                    const checkbox = document.getElementById(id);
+                    checkbox.addEventListener('change', (e) => {
+                        this.settings[property] = e.target.checked;
+                        objects.forEach(obj => obj.visible = e.target.checked);
+                        
+                        // Update quick toggle
+                        const quickBtn = document.getElementById('quick' + property.replace('show', ''));
+                        if (quickBtn) {
+                            quickBtn.classList.toggle('active', e.target.checked);
+                        }
+                    });
+                });
+                
+                // Magnetosphere toggle
+                document.getElementById('showMagnetosphere').addEventListener('change', (e) => {
+                    this.settings.showMagnetosphere = e.target.checked;
+                    if (this.magnetosphere) {
+                        this.magnetosphere.visible = e.target.checked;
+                    }
+                });
+                
+                // Scale sliders
+                document.getElementById('distanceScale').addEventListener('input', (e) => {
+                    this.settings.distanceScale = parseFloat(e.target.value);
+                    document.getElementById('distanceValue').textContent = this.settings.distanceScale.toFixed(1) + 'x';
+                    this.updateMoonPositions();
+                });
+                
+                document.getElementById('moonScale').addEventListener('input', (e) => {
+                    this.settings.moonScale = parseFloat(e.target.value);
+                    document.getElementById('moonSizeValue').textContent = this.settings.moonScale + 'x';
+                    this.moons.forEach(moon => {
+                        moon.scale.setScalar(this.settings.moonScale);
+                    });
+                });
+                
+                document.getElementById('ringShine').addEventListener('input', (e) => {
+                    this.settings.ringShine = parseFloat(e.target.value);
+                    document.getElementById('ringShineValue').textContent = Math.round(this.settings.ringShine * 100) + '%';
+                    this.rings.forEach(ring => {
+                        ring.material.opacity = ring.userData.baseOpacity * this.settings.ringShine;
+                    });
+                });
+                
+                // Quick toggle buttons
+                document.getElementById('quickRings').addEventListener('click', () => {
+                    document.getElementById('showRings').click();
+                });
+                
+                document.getElementById('quickMoons').addEventListener('click', () => {
+                    document.getElementById('showMoons').click();
+                });
+                
+                document.getElementById('quickOrbits').addEventListener('click', () => {
+                    document.getElementById('showOrbits').click();
+                });
+                
+                document.getElementById('quickMag').addEventListener('click', () => {
+                    document.getElementById('showMagnetosphere').click();
+                });
+                
+                document.getElementById('quickLabels').addEventListener('click', () => {
+                    document.getElementById('showLabels').click();
+                });
+                
+                // Help button
+                document.getElementById('help-button').addEventListener('click', () => {
+                    this.showMessage(`🌌 URANUS SIMULATION HELP 🌌
+                    
+CAMERA CONTROLS:
+• Left Click + Drag: Rotate view
+• Scroll Wheel: Zoom in/out
+• Right Click + Drag: Pan view
+
+FEATURES:
+• 27 Moons: All known moons of Uranus
+• 13 Rings: Including the bright ε ring
+• Time Control: Speed up or slow down
+• Toggles: Show/hide different components
+
+SCIENTIFIC ACCURACY:
+• Realistic orbital mechanics
+• Proper moon sizes and distances
+• Authentic ring system
+• 97.77° axial tilt (sideways planet!)
+
+Enjoy exploring the Uranus system! 🪐`);
+                });
+                
+                // Raycasting for moon hover
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                
+                this.renderer.domElement.addEventListener('mousemove', (e) => {
+                    if (this.isMouseDown) return;
+                    
+                    const rect = this.renderer.domElement.getBoundingClientRect();
+                    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                    
+                    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    const intersects = this.raycaster.intersectObjects(this.moons);
+                    
+                    const moonInfo = document.getElementById('moon-info');
+                    
+                    if (intersects.length > 0) {
+                        const moon = intersects[0].object;
+                        const data = moon.userData;
+                        
+                        document.getElementById('moon-name').textContent = data.name;
+                        document.getElementById('moon-details').textContent = data.info;
+                        document.getElementById('moon-position').textContent = 
+                            `Distance: ${data.distance} RU | Period: ${Math.abs(data.period)} hours`;
+                        
+                        moonInfo.classList.add('visible');
+                        this.renderer.domElement.style.cursor = 'pointer';
+                        
+                        // Highlight moon
+                        moon.material.emissiveIntensity = 0.3;
+                    } else {
+                        moonInfo.classList.remove('visible');
+                        this.renderer.domElement.style.cursor = 'grab';
+                        
+                        // Remove highlights
+                        this.moons.forEach(moon => {
+                            moon.material.emissiveIntensity = 0.05;
+                        });
+                    }
+                });
+            }
+            
+            updateCameraPosition() {
+                const x = this.cameraDistance * Math.sin(this.cameraPhi) * Math.cos(this.cameraTheta);
+                const y = this.cameraDistance * Math.cos(this.cameraPhi);
+                const z = this.cameraDistance * Math.sin(this.cameraPhi) * Math.sin(this.cameraTheta);
+                
+                this.camera.position.set(x, y, z);
+                this.camera.lookAt(0, 0, 0);
+            }
+            
+            updateMoonPositions() {
+                this.moons.forEach((moon, index) => {
+                    const data = moon.userData;
+                    const distance = data.distance * this.settings.distanceScale;
+                    moon.position.x = Math.cos(data.angle) * distance;
+                    moon.position.z = Math.sin(data.angle) * distance;
+                    
+                    // Update orbit
+                    const orbit = this.orbits[index];
+                    if (orbit) {
+                        orbit.geometry.dispose();
+                        orbit.geometry = new THREE.RingGeometry(distance - 0.5, distance + 0.5, 64, 1);
+                    }
+                    
+                    // Update label position
+                    const label = this.moonLabels.find(l => l.userData.moonName === data.name);
+                    if (label) {
+                        label.position.copy(moon.position);
+                        label.position.y += data.radius * this.settings.moonScale + 2;
+                    }
+                });
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                const currentTime = performance.now();
+                const deltaTime = (currentTime - (this.lastTime || currentTime)) / 1000;
+                this.lastTime = currentTime;
+                
+                if (!this.isPaused) {
+                    this.simulationTime += deltaTime * this.timeSpeed;
+                    
+                    // Rotate Uranus
+                    this.rotation += deltaTime * this.timeSpeed * 0.1;
+                    if (this.uranus) {
+                        this.uranus.rotation.y = -this.rotation; // Retrograde
+                    }
+                    
+                    // Move moons
+                    this.moons.forEach(moon => {
+                        const data = moon.userData;
+                        const period = Math.abs(data.period);
+                        const speed = (2 * Math.PI) / (period * 3600); // Convert hours to seconds
+                        
+                        if (data.period < 0) {
+                            data.angle -= speed * deltaTime * this.timeSpeed; // Retrograde
+                        } else {
+                            data.angle += speed * deltaTime * this.timeSpeed; // Prograde
+                        }
+                        
+                        const distance = data.distance * this.settings.distanceScale;
+                        moon.position.x = Math.cos(data.angle) * distance;
+                        moon.position.z = Math.sin(data.angle) * distance;
+                        
+                        // Tidal locking - moon faces Uranus
+                        moon.lookAt(0, moon.position.y, 0);
+                        
+                        // Update label position
+                        const label = this.moonLabels.find(l => l.userData.moonName === data.name);
+                        if (label) {
+                            label.position.copy(moon.position);
+                            label.position.y += data.radius * this.settings.moonScale + 2;
+                        }
+                    });
+                    
+                    // Rotate rings slowly
+                    this.rings.forEach(ring => {
+                        ring.rotation.y += deltaTime * this.timeSpeed * 0.001;
+                    });
+                    
+                    // Animate magnetosphere
+                    if (this.magnetosphere) {
+                        this.magnetosphere.rotation.y += deltaTime * 0.01;
+                    }
+                }
+                
+                // Update UI stats
+                this.updateStats();
+                
+                // Render scene
+                this.renderer.render(this.scene, this.camera);
+                
+                // Update FPS
+                this.frameCount++;
+                if (currentTime - this.lastFpsTime > 1000) {
+                    this.currentFPS = Math.round(this.frameCount * 1000 / (currentTime - this.lastFpsTime));
+                    this.frameCount = 0;
+                    this.lastFpsTime = currentTime;
+                }
+            }
+            
+            updateStats() {
+                // FPS
+                document.getElementById('fps').textContent = this.currentFPS;
+                
+                // Simulation time
+                const hours = this.simulationTime / 3600;
+                if (hours < 24) {
+                    document.getElementById('simDay').textContent = hours.toFixed(1) + 'h';
+                } else {
+                    const days = hours / 24;
+                    document.getElementById('simDay').textContent = days.toFixed(1) + 'd';
+                }
+                
+                // Rotation
+                const degrees = ((-this.rotation * 180 / Math.PI) % 360 + 360) % 360;
+                document.getElementById('rotation').textContent = degrees.toFixed(0) + '°';
+                
+                // Year progress
+                const yearHours = 84 * 365.25 * 24;
+                const yearProgress = (this.simulationTime / yearHours * 100) % 100;
+                document.getElementById('yearProgress').textContent = yearProgress.toFixed(2) + '%';
+                
+                // Camera info
+                document.getElementById('camX').textContent = this.camera.position.x.toFixed(1);
+                document.getElementById('camY').textContent = this.camera.position.y.toFixed(1);
+                document.getElementById('camZ').textContent = this.camera.position.z.toFixed(1);
+                document.getElementById('camDist').textContent = this.cameraDistance.toFixed(1);
+                document.getElementById('camAzimuth').textContent = (this.cameraTheta * 180 / Math.PI).toFixed(1);
+                document.getElementById('camElevation').textContent = ((Math.PI/2 - this.cameraPhi) * 180 / Math.PI).toFixed(1);
+            }
+            
+            showMessage(text) {
+                const msg = document.createElement('div');
+                msg.className = 'message';
+                msg.style.whiteSpace = 'pre-line';
+                msg.textContent = text;
+                
+                document.body.appendChild(msg);
+                
+                setTimeout(() => {
+                    msg.style.opacity = '0';
+                    msg.style.transform = 'translateX(-50%) translateY(-20px)';
+                    setTimeout(() => msg.remove(), 300);
+                }, 4000);
+            }
+            
+            showError(message) {
+                document.getElementById('loading').innerHTML = `
+                    <div style="color: #ff6b6b; text-align: center;">
+                        <div>⚠️ Error</div>
+                        <div style="font-size: 16px; margin-top: 10px;">${message}</div>
+                        <button class="control-button" onclick="location.reload()" style="margin-top: 20px;">
                             Reload Page
                         </button>
                     </div>
@@ -678,223 +1432,47 @@
             }
         }
         
-        // Physics toggle handler
-        function setupPhysicsToggle() {
-            const physicsMainToggle = document.getElementById('physicsMainToggle');
-            const statusEl = document.getElementById('physicsStatus');
-            const statusText = document.getElementById('physicsStatusText');
-            const indicators = document.getElementById('physics-indicators');
-            const experiments = document.getElementById('experimentButtons');
-            const quickPhysics = document.getElementById('quickPhysics');
+        // Initialize simulation when page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 Starting Uranus Simulation...');
             
-            physicsMainToggle.addEventListener('change', (e) => {
-                const isEnabled = e.target.checked;
-                window.UranusSimulationState.physicsEnabled = isEnabled;
-                
-                if (isEnabled) {
-                    statusEl.classList.add('active');
-                    statusText.textContent = 'Enhanced Mode';
-                    indicators.classList.add('visible');
-                    experiments.style.display = 'flex';
-                    quickPhysics.classList.add('active');
-                    document.getElementById('physicsMode').textContent = 'ENHANCED';
-                    document.getElementById('integrationMethod').textContent = 'RK4';
-                    
-                    // Enable experiment buttons (placeholder functionality)
-                    document.querySelectorAll('.experiment-btn').forEach(btn => {
-                        btn.disabled = false;
-                    });
-                    
-                } else {
-                    statusEl.classList.remove('active');
-                    statusText.textContent = 'Disabled';
-                    indicators.classList.remove('visible');
-                    experiments.style.display = 'none';
-                    quickPhysics.classList.remove('active');
-                    document.getElementById('physicsMode').textContent = 'OFF';
-                    document.getElementById('integrationMethod').textContent = 'Kepler';
-                    
-                    // Disable experiment buttons
-                    document.querySelectorAll('.experiment-btn').forEach(btn => {
-                        btn.disabled = true;
-                    });
-                }
-            });
-            
-            // Quick physics toggle
-            quickPhysics.addEventListener('click', () => {
-                physicsMainToggle.checked = !physicsMainToggle.checked;
-                physicsMainToggle.dispatchEvent(new Event('change'));
-            });
-        }
-        
-        // Setup experiment buttons
-        function setupExperimentButtons() {
-            // Placeholder implementations - these would connect to actual physics engine
-            document.getElementById('launchParticleBtn')?.addEventListener('click', () => {
-                console.log('Launch particle feature would be implemented here');
-                // Could add a visual effect or show a message
-                showMessage('🚀 Test particle launched! (Feature in development)');
-            });
-            
-            document.getElementById('showLagrangeBtn')?.addEventListener('click', function() {
-                this.classList.toggle('active');
-                const isActive = this.classList.contains('active');
-                console.log('Lagrange points:', isActive ? 'shown' : 'hidden');
-                showMessage(isActive ? '📍 Lagrange points shown' : '📍 Lagrange points hidden');
-            });
-            
-            document.getElementById('showGravityBtn')?.addEventListener('click', function() {
-                this.classList.toggle('active');
-                const isActive = this.classList.contains('active');
-                console.log('Gravity field visualization:', isActive ? 'enabled' : 'disabled');
-                showMessage(isActive ? '🌊 Gravity field visualization enabled' : '🌊 Gravity field visualization disabled');
-            });
-            
-            document.getElementById('tidalStressBtn')?.addEventListener('click', function() {
-                this.classList.toggle('active');
-                const isActive = this.classList.contains('active');
-                console.log('Tidal stress visualization:', isActive ? 'enabled' : 'disabled');
-                showMessage(isActive ? '💫 Tidal stress visualization enabled' : '💫 Tidal stress visualization disabled');
-            });
-        }
-        
-        // Show temporary message
-        function showMessage(text) {
-            const msg = document.createElement('div');
-            msg.style.cssText = `
-                position: fixed;
-                top: 100px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: rgba(79, 208, 231, 0.9);
-                color: white;
-                padding: 10px 20px;
-                border-radius: 20px;
-                z-index: 1500;
-                font-size: 14px;
-                backdrop-filter: blur(10px);
-                animation: slideIn 0.3s ease-out;
-            `;
-            msg.textContent = text;
-            
-            // Add animation keyframes
-            if (!document.getElementById('messageAnimations')) {
-                const style = document.createElement('style');
-                style.id = 'messageAnimations';
-                style.textContent = `
-                    @keyframes slideIn {
-                        from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-                        to { opacity: 1; transform: translateX(-50%) translateY(0); }
-                    }
+            // Check if Three.js loaded
+            if (typeof THREE === 'undefined') {
+                console.error('Three.js failed to load');
+                document.getElementById('loading').innerHTML = `
+                    <div style="color: #ff6b6b; text-align: center;">
+                        <div>⚠️ Three.js Library Failed to Load</div>
+                        <div style="font-size: 14px; margin-top: 10px;">
+                            Check your internet connection and reload the page
+                        </div>
+                        <button class="control-button" onclick="location.reload()" style="margin-top: 20px;">
+                            Reload Page
+                        </button>
+                    </div>
                 `;
-                document.head.appendChild(style);
+                return;
             }
             
-            document.body.appendChild(msg);
-            setTimeout(() => {
-                msg.style.opacity = '0';
-                msg.style.transform = 'translateX(-50%) translateY(-20px)';
-                setTimeout(() => msg.remove(), 300);
-            }, 2000);
-        }
-        
-        // Setup tutorial
-        function setupTutorial() {
-            const tutorialOverlay = document.getElementById('tutorialOverlay');
-            const tutorialClose = document.getElementById('tutorialClose');
-            const helpButton = document.getElementById('help-button');
-            
-            // Show tutorial on first visit
-            if (!localStorage.getItem('uranusSimTutorialShown')) {
-                setTimeout(() => {
-                    tutorialOverlay.style.display = 'block';
-                    localStorage.setItem('uranusSimTutorialShown', 'true');
-                }, 3000);
-            }
-            
-            // Tutorial close button
-            tutorialClose.addEventListener('click', () => {
-                tutorialOverlay.style.display = 'none';
-            });
-            
-            // Help button shows tutorial
-            helpButton.addEventListener('click', () => {
-                tutorialOverlay.style.display = 'block';
-            });
-        }
-        
-        // Initialize all UI components
-        function initializeUI() {
-            setupPhysicsToggle();
-            setupExperimentButtons();
-            setupTutorial();
-            
-            console.log('UI components initialized');
-        }
-        
-        // Initialize main simulation
-        async function initializeSimulation() {
             try {
-                console.log('🚀 Loading Uranus Simulation...');
+                const simulation = new UranusSimulation();
+                await simulation.init();
                 
-                // Load main simulation module
-                const mainModule = await import('./js/main.js');
-                console.log('Main simulation module loaded');
-                
-                // Wait for simulation to be available
-                let attempts = 0;
-                const maxAttempts = 50;
-                
-                const waitForSimulation = () => {
-                    return new Promise((resolve, reject) => {
-                        const checkInterval = setInterval(() => {
-                            attempts++;
-                            
-                            if (window.UranusSimulation && window.UranusSimulation.isInitialized) {
-                                clearInterval(checkInterval);
-                                resolve(window.UranusSimulation);
-                            } else if (attempts >= maxAttempts) {
-                                clearInterval(checkInterval);
-                                reject(new Error('Simulation failed to initialize within timeout'));
-                            }
-                        }, 100);
-                    });
-                };
-                
-                const simulation = await waitForSimulation();
-                window.UranusSimulationState.loaded = true;
-                window.UranusSimulationState.simulation = simulation;
-                
-                console.log('✅ Uranus Simulation fully loaded!');
+                // Export to global scope for debugging
+                window.UranusSimulation = simulation;
                 
             } catch (error) {
-                console.error('Failed to load simulation:', error);
-                showError(`Failed to load simulation: ${error.message}`);
+                console.error('Failed to initialize simulation:', error);
+                document.getElementById('loading').innerHTML = `
+                    <div style="color: #ff6b6b; text-align: center;">
+                        <div>⚠️ Initialization Failed</div>
+                        <div style="font-size: 14px; margin-top: 10px;">${error.message}</div>
+                        <button class="control-button" onclick="location.reload()" style="margin-top: 20px;">
+                            Try Again
+                        </button>
+                    </div>
+                `;
             }
-        }
-        
-        // Main initialization
-        async function initialize() {
-            try {
-                // Initialize UI components first
-                initializeUI();
-                
-                // Load and initialize the simulation
-                await initializeSimulation();
-                
-            } catch (error) {
-                console.error('Initialization failed:', error);
-                showError(error.message);
-            }
-        }
-        
-        // Start initialization when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initialize);
-        } else {
-            initialize();
-        }
+        });
     </script>
 </body>
 </html>
