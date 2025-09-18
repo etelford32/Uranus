@@ -1,6 +1,17 @@
 /**
  * Enhanced AnimationLoop - Advanced animation and update orchestration
  * Features: Adaptive frame skipping, smooth interpolation, intelligent quality management
+ * Improvements:
+ * - Fixed bug in transitionQuality fadeOut elapsed time calculation.
+ * - Reset slowFrames in performance metrics to prevent unbounded growth.
+ * - Added device capability detection for initial quality setting.
+ * - Throttled UI updates (e.g., camera info, stats) to every 5 frames for better performance.
+ * - Optimized interpolation caching to reduce Map operations.
+ * - Reduced default maxSubSteps to 4 for better baseline FPS.
+ * - Added requestIdleCallback for non-critical UI updates when possible.
+ * - Improved error recovery with partial frame continuation.
+ * - Enhanced Uranus-specific rotation handling with axial tilt compensation.
+ * - Minor refactoring for readability and reduced conditionals in updateComponent.
  */
 
 import { SimulationState, PerformanceSettings, DisplaySettings } from '../config/settings.js';
@@ -144,13 +155,15 @@ export default class AnimationLoop {
     this.lastTime = performance.now();
     this.accumulator = 0;
     this.fixedTimeStep = 1000 / 60;
-    this.maxSubSteps = 5;
+    this.maxSubSteps = 4; // Reduced for better baseline FPS
     this.frameCount = 0;
     this.totalTime = 0;
     
-    // Interpolation state
+    // Interpolation state - optimized with direct properties for common keys
     this.interpolationEnabled = true;
     this.interpolationStates = new Map();
+    this.moonsPrevState = null; // Direct cache for moons
+    this.uranusSmoothDelta = 0; // Direct cache for Uranus delta
     
     // Advanced performance monitoring
     this.performanceMonitor = {
@@ -168,7 +181,7 @@ export default class AnimationLoop {
     
     // Performance profiler
     this.profiler = new PerformanceProfiler();
-    this.profiler.enabled = false; // Enable for debugging
+    this.profiler.enabled = false; // Disabled by default for perf
     
     // Update orchestrator
     this.orchestrator = new UpdateOrchestrator();
@@ -195,9 +208,37 @@ export default class AnimationLoop {
     this.errorCount = 0;
     this.maxErrors = 10;
     
+    // UI throttling
+    this.uiFrameCounter = 0;
+    this.uiThrottle = 5; // Update UI every 5 frames
+    
+    // Uranus-specific: Axial tilt (approx 98 degrees in radians)
+    this.uranusAxialTilt = Math.PI * 98 / 180;
+    
+    // Device detection for initial quality
+    this.setInitialQuality();
+    
     // Bind methods
     this.animate = this.animate.bind(this);
     this.handleError = this.handleError.bind(this);
+  }
+
+  /**
+   * Set initial quality based on device capabilities
+   */
+  setInitialQuality() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const hasHighPerf = navigator.hardwareConcurrency && navigator.hardwareConcurrency >= 4;
+    
+    let initialQuality = 'medium';
+    if (isMobile || !hasHighPerf) {
+      initialQuality = 'low';
+    } else if (hasHighPerf && 'getContextAttributes' in this.renderer.domElement.getContext('webgl')) {
+      initialQuality = 'high';
+    }
+    
+    PerformanceSettings.currentQuality = initialQuality;
+    this.setQuality(initialQuality);
   }
 
   /**
@@ -224,6 +265,7 @@ export default class AnimationLoop {
       this.lastTime = performance.now();
       this.totalTime = 0;
       this.frameCount = 0;
+      this.uiFrameCounter = 0;
       
       console.log('🎬 AnimationLoop started');
       this.animate();
@@ -273,7 +315,7 @@ export default class AnimationLoop {
       // Render with optional frame skipping
       this.processRender(deltaTime);
       
-      // Update monitoring
+      // Update monitoring (throttled)
       this.updateMonitoring(deltaTime);
       
       // End profiling
@@ -388,7 +430,7 @@ export default class AnimationLoop {
     
     // Update orbital mechanics with interpolation state caching
     if (this.components.moons) {
-      this.cacheInterpolationState('moons', this.components.moons.getCurrentMoonPositions());
+      this.moonsPrevState = this.components.moons.getCurrentMoonPositions(); // Cache previous
       this.components.moons.update(
         deltaTime,
         SimulationState.timeSpeed,
@@ -412,12 +454,15 @@ export default class AnimationLoop {
   }
 
   /**
-   * Update individual component with error handling
+   * Update individual component with error handling and reduced conditionals
    */
   updateComponent(componentName, deltaTime, alpha, group) {
     try {
       const component = this.components[componentName];
       if (!component) return;
+      
+      const isPaused = SimulationState.isPaused;
+      const showMagnetosphere = DisplaySettings.showMagnetosphere;
       
       switch (componentName) {
         case 'cameraController':
@@ -425,15 +470,16 @@ export default class AnimationLoop {
           break;
           
         case 'uranus':
-          if (!SimulationState.isPaused) {
-            // Smooth rotation with interpolation
-            const smoothDelta = this.applySmoothDelta(deltaTime, 'uranus');
-            component.update(smoothDelta, SimulationState.timeSpeed);
+          if (!isPaused) {
+            // Smooth rotation with interpolation and axial tilt compensation
+            const smoothDelta = this.uranusSmoothDelta + (deltaTime - this.uranusSmoothDelta) * 0.1;
+            this.uranusSmoothDelta = smoothDelta;
+            component.update(smoothDelta, SimulationState.timeSpeed, this.uranusAxialTilt);
           }
           break;
           
         case 'rings':
-          if (!SimulationState.isPaused) {
+          if (!isPaused) {
             const uranusRotation = this.components.uranus?.getRotation?.() ?? 0;
             const moonPositions = this.getInterpolatedMoonPositions(alpha);
             component.update(deltaTime, uranusRotation, moonPositions);
@@ -441,7 +487,7 @@ export default class AnimationLoop {
           break;
           
         case 'magnetosphere':
-          if (!SimulationState.isPaused && DisplaySettings.showMagnetosphere) {
+          if (!isPaused && showMagnetosphere) {
             const uranusRotation = this.components.uranus?.getRotation?.() ?? 0;
             component.update(deltaTime, uranusRotation);
           }
@@ -468,22 +514,11 @@ export default class AnimationLoop {
   }
 
   /**
-   * Apply smooth delta for component updates
-   */
-  applySmoothDelta(deltaTime, componentName) {
-    const smoothingFactor = 0.1;
-    const prevDelta = this.interpolationStates.get(`${componentName}_delta`) || deltaTime;
-    const smoothDelta = prevDelta + (deltaTime - prevDelta) * smoothingFactor;
-    this.interpolationStates.set(`${componentName}_delta`, smoothDelta);
-    return smoothDelta;
-  }
-
-  /**
-   * Get interpolated moon positions
+   * Get interpolated moon positions (optimized with direct cache)
    */
   getInterpolatedMoonPositions(alpha) {
     const current = this.components.moons?.getCurrentMoonPositions?.() ?? [];
-    const previous = this.interpolationStates.get('moons') ?? current;
+    const previous = this.moonsPrevState ?? current;
     
     if (!this.interpolationEnabled || alpha >= 1) {
       return current;
@@ -508,15 +543,6 @@ export default class AnimationLoop {
   }
 
   /**
-   * Cache interpolation state
-   */
-  cacheInterpolationState(key, value) {
-    if (this.interpolationEnabled) {
-      this.interpolationStates.set(key, value);
-    }
-  }
-
-  /**
    * Process rendering with optional frame skipping
    */
   processRender(deltaTime) {
@@ -529,8 +555,7 @@ export default class AnimationLoop {
       return;
     }
     
-    // Update camera info before render
-    this.updateCameraInfo();
+    // Update camera info before render (throttled in monitoring)
     
     // Render the scene
     if (this.renderer && this.scene && this.camera) {
@@ -568,9 +593,15 @@ export default class AnimationLoop {
   updateMonitoring(deltaTime) {
     this.frameCount++;
     this.totalTime += deltaTime;
+    this.uiFrameCounter++;
     
     // Update performance metrics
     this.updatePerformanceMetrics(deltaTime);
+    
+    // Throttled UI updates
+    if (this.uiFrameCounter % this.uiThrottle === 0) {
+      this.updateUI();
+    }
     
     // Check for quality adjustments
     this.checkQualityAdjustment();
@@ -578,6 +609,40 @@ export default class AnimationLoop {
     // Log performance report periodically
     if (this.frameCount % 300 === 0 && this.profiler.enabled) {
       console.log('Performance Report:', this.profiler.getReport());
+    }
+  }
+
+  /**
+   * Throttled UI updates using requestIdleCallback if available
+   */
+  updateUI() {
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        this.updateCameraInfo();
+        this.dispatchPerformanceEvent();
+      });
+    } else {
+      this.updateCameraInfo();
+      this.dispatchPerformanceEvent();
+    }
+  }
+
+  /**
+   * Dispatch performance event
+   */
+  dispatchPerformanceEvent() {
+    const avgFrameTime = this.performanceMonitor.averageFrameTime;
+    const fps = Math.round(1000 / avgFrameTime);
+    
+    if (this.renderer && this.renderer.domElement) {
+      this.renderer.domElement.dispatchEvent(new CustomEvent('performanceUpdate', {
+        detail: {
+          fps,
+          averageFrameTime: avgFrameTime,
+          droppedFrames: this.performanceMonitor.droppedFrames,
+          quality: PerformanceSettings.currentQuality
+        }
+      }));
     }
   }
 
@@ -593,25 +658,11 @@ export default class AnimationLoop {
     if (pm.frameCount >= 60) {
       pm.averageFrameTime = pm.totalTime / pm.frameCount;
       
-      // Calculate FPS
-      const fps = Math.round(1000 / pm.averageFrameTime);
-      
-      // Dispatch performance event
-      if (this.renderer && this.renderer.domElement) {
-        this.renderer.domElement.dispatchEvent(new CustomEvent('performanceUpdate', {
-          detail: {
-            fps,
-            averageFrameTime: pm.averageFrameTime,
-            droppedFrames: pm.droppedFrames,
-            quality: PerformanceSettings.currentQuality
-          }
-        }));
-      }
-      
-      // Reset counters
+      // Reset counters including slowFrames
       pm.frameCount = 0;
       pm.totalTime = 0;
       pm.droppedFrames = 0;
+      pm.slowFrames = 0; // Reset to prevent accumulation
     }
 
     // Track slow frames
@@ -667,7 +718,7 @@ export default class AnimationLoop {
   }
 
   /**
-   * Smooth quality transition
+   * Smooth quality transition (fixed elapsed time bug)
    */
   transitionQuality(fromQuality, toQuality) {
     console.log(`📊 Quality transition: ${fromQuality} → ${toQuality}`);
@@ -677,10 +728,11 @@ export default class AnimationLoop {
     
     // Fade out effect
     const fadeOutDuration = 200;
-    const startOpacity = this.renderer.domElement.style.opacity || 1;
+    const startTime = performance.now();
+    const startOpacity = parseFloat(this.renderer.domElement.style.opacity) || 1;
     
     const fadeOut = (timestamp) => {
-      const elapsed = timestamp - performance.now();
+      const elapsed = timestamp - startTime;
       const progress = Math.min(elapsed / fadeOutDuration, 1);
       const opacity = startOpacity * (1 - progress * 0.3); // Fade to 70%
       
@@ -719,15 +771,15 @@ export default class AnimationLoop {
     // Adjust settings based on quality
     switch (quality) {
       case 'low':
-        this.maxSubSteps = 3;
+        this.maxSubSteps = 2;
         this.interpolationEnabled = false;
         break;
       case 'medium':
-        this.maxSubSteps = 5;
+        this.maxSubSteps = 4;
         this.interpolationEnabled = true;
         break;
       case 'high':
-        this.maxSubSteps = 7;
+        this.maxSubSteps = 6;
         this.interpolationEnabled = true;
         break;
     }
@@ -764,7 +816,7 @@ export default class AnimationLoop {
   }
 
   /**
-   * Handle errors gracefully
+   * Handle errors gracefully with partial recovery
    */
   handleError(error) {
     console.error('AnimationLoop error:', error);
@@ -788,6 +840,10 @@ export default class AnimationLoop {
           </div>
         `;
       }
+    } else {
+      // Partial recovery: Skip non-critical updates next frame
+      this.interpolationEnabled = false;
+      setTimeout(() => { this.interpolationEnabled = true; }, 100);
     }
   }
 
@@ -913,7 +969,10 @@ export default class AnimationLoop {
     this.totalTime = 0;
     this.errorCount = 0;
     this.interpolationStates.clear();
+    this.moonsPrevState = null;
+    this.uranusSmoothDelta = 0;
     this.frameTimer.frameHistory = [];
+    this.uiFrameCounter = 0;
     
     console.log('🔄 Simulation reset');
   }
@@ -924,9 +983,10 @@ export default class AnimationLoop {
   dispose() {
     this.stop();
     
-    // Clear all maps
+    // Clear all maps and caches
     this.interpolationStates.clear();
     this.orchestrator.updateGroups.clear();
+    this.moonsPrevState = null;
     
     // Clear cached elements
     this.cameraInfoElements = null;
